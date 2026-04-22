@@ -73,6 +73,37 @@ class SensorController {
             res.status(500).json({ error: 'Erro ao listar sensores' });
         }
     }
+
+    async atualizar(req, res) {
+    try {
+        const { id } = req.params;
+        const { nome_local } = req.body;
+
+        if (!nome_local) {
+            return res.status(400).json({ error: "Nome é obrigatório" });
+        }
+
+        await sensorModel.atualizar(id, nome_local);
+
+        res.json({ mensagem: "Sensor atualizado" });
+
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao atualizar sensor" });
+    }
+}
+
+    async deletar(req, res) {
+    try {
+        const { id } = req.params;
+
+        await sensorModel.deletar(id);
+
+        res.json({ mensagem: "Sensor deletado" });
+
+    } catch (error) {
+        res.status(500).json({ error: "Erro ao deletar sensor" });
+    }
+}
 }
 
 export default new SensorController();
