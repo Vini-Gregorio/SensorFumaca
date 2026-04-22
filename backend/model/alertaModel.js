@@ -173,3 +173,27 @@ export async function getIntervaloMedio(usuarioId) {
 
   return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
 }
+
+// 🔥 Buscar por período
+export async function buscarPorPeriodo(usuarioId, inicio, fim) {
+  const query = `
+    SELECT a.*
+    FROM alertas a
+    JOIN sensores s ON a.sensor = s.identificador
+    WHERE s.usuario_id = ?
+    AND a.data_hora BETWEEN ? AND ?
+    ORDER BY a.data_hora DESC
+  `;
+  const [rows] = await pool.execute(query, [usuarioId, inicio, fim]);
+  return rows;
+}
+
+// 🔥 Marcar como resolvido
+export async function marcarResolvido(id) {
+  const query = `
+    UPDATE alertas
+    SET resolvido = 1
+    WHERE id = ?
+  `;
+  await pool.execute(query, [id]);
+}
