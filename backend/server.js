@@ -156,6 +156,11 @@ app.use("/alertas", alertaRouter);
 
 // Recebe dados do ESP32 via POST
 app.post("/dados", async (req, res) => {
+  const token = req.headers.authorization;
+
+  if (token !== "Bearer SENSOR_TOKEN_123") {
+    return res.status(401).json({ erro: "Não autorizado" });
+  }
   try {
     const { sensor, valor, nivel } = req.body;
 
