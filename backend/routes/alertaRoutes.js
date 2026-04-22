@@ -45,3 +45,34 @@ router.get("/dashboard", autenticar, async (req, res) => {
 });
 
 export default router;
+
+// 🔥 Buscar por período
+router.get("/periodo", autenticar, async (req, res) => {
+  try {
+    const usuarioId = req.session.usuario.id;
+    const { dataInicio, dataFim } = req.query;
+
+    const alertas = await alertaModel.buscarPorPeriodo(
+      usuarioId,
+      dataInicio,
+      dataFim
+    );
+
+    res.json(alertas);
+  } catch (err) {
+    res.status(500).json({ erro: "Erro ao buscar por período" });
+  }
+});
+
+// 🔥 Marcar alerta como resolvido
+router.patch("/:id", autenticar, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await alertaModel.marcarResolvido(id);
+
+    res.json({ mensagem: "Alerta marcado como resolvido" });
+  } catch (err) {
+    res.status(500).json({ erro: "Erro ao atualizar alerta" });
+  }
+});
