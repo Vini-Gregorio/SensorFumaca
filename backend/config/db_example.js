@@ -2,24 +2,14 @@ import mysql from 'mysql2/promise';
 
 const pool = mysql.createPool({
   host: 'localhost',
-  user: 'dev',
-  password: '1234',
+  user: 'root',
+  password: '',
   database: 'sensores',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 });
-/*
-const pool = mysql.createPool({
-  host: '172.30.0.17', //sla
-  user: 'root',
-  password: 'user1232025',
-  database: 'SensorFumaca',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
-*/
+
 
 async function testConnection() {
   try {

@@ -3,7 +3,13 @@ import sensorController from "../controller/sensorController.js";
 
 const router = express.Router();
 
-router.post("/register", sensorController.registerSensor);
+router.post("/register", sensorController.registerSensorWeb);
+router.post("api/register", sensorController.registerSensorApi);
+// lista todos (GET /sensores) — opcional
 router.get("/", sensorController.listar);
+
+// buscar por identificador (GET /sensores/:identificador)
+// usar bind garante que o `this` do controller esteja correto, embora aqui não usemos `this`.
+router.get("/:identificador", sensorController.buscarPorIdentificador.bind(sensorController));
 
 export default router;
