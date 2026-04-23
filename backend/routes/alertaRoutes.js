@@ -4,7 +4,7 @@ import { autenticar } from "../auth.js";
 import * as alertaModel from "../model/alertaModel.js";
 
 const router = express.Router();
-
+router.get("/:usuarioId", listarAlertas);
 // Removida rota GET /:usuarioId para evitar conflito com /dashboard
 router.post("/", criarAlerta);
 router.get("/", async (req, res) => {
