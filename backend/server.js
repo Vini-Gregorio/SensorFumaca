@@ -5,6 +5,7 @@ import session from 'express-session';
 import usuarioRouter from './routes/usuarioRoutes.js';
 import sensorRouter from './routes/sensorRoutes.js';
 import alertaRouter from './routes/alertaRoutes.js';
+import { addAlerta } from './model/alertaModel.js';
 
 import userController from './controller/usuarioController.js';
 import sensorModel from './model/sensor.js';
