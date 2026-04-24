@@ -76,3 +76,16 @@ router.patch("/:id", autenticar, async (req, res) => {
     res.status(500).json({ erro: "Erro ao atualizar alerta" });
   }
 });
+
+router.get("/ano", autenticar, async (req, res) => {
+  try {
+    const usuarioId = req.session.usuario.id;
+    const { ano } = req.query;
+
+    const dados = await alertaModel.agruparPorAno(usuarioId, ano);
+
+    res.json(dados);
+  } catch (err) {
+    res.status(500).json({ erro: "Erro ao buscar histórico" });
+  }
+});
