@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MQ-FIRE - Histórico</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      background: #f3f3f3;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen font-sans pb-16">
+
+  <main class="max-w-7xl mx-auto px-6 pt-12">
+    <h1 class="text-4xl text-gray-800 mb-10 mt-16">Histórico de Alertas</h1>
+
+    <!-- filtro -->
+    <div class="mb-6">
+      <label class="text-gray-600">Ano:</label>
+      <select id="ano" class="ml-2 p-2 border rounded">
+        <option>2026</option>
+        <option>2025</option>
+        <option>2024</option>
+      </select>
+
+      <button onclick="carregarGrafico()" 
+              class="ml-4 bg-blue-500 text-white px-4 py-2 rounded">
+        Carregar
+      </button>
+    </div>
+
+    <!-- gráfico -->
+    <div class="bg-white p-6 rounded shadow">
+      <canvas id="graficoAlertas"></canvas>
+    </div>
+
+  </main>
+
+  <script>
+    let chart;
+
+    async function carregarGrafico() {
+      const ano = document.getElementById("ano").value;
+
+      const res = await fetch(`/api/alertas/ano?ano=${ano}`, {
+        credentials: "include"
+      });
+
+      const dados = await res.json();
+
+      const labels = [
+        "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+        "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+      ];
+
+      const valores = new Array(12).fill(0);
+
+      dados.forEach(item => {
+        valores[item.mes - 1] = item.total;
+      });
+
+      if (chart) chart.destroy();
+
+      const ctx = document.getElementById("graficoAlertas");
+
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Alertas por mês",
+            data: valores
+          }]
+        }
+      });
+    }
+
+    carregarGrafico();
+  </script>
+
+</body>
+</html>
