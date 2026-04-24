@@ -197,3 +197,20 @@ export async function marcarResolvido(id) {
   `;
   await pool.execute(query, [id]);
 }
+
+export async function agruparPorAno(usuarioId, ano) {
+  const query = `
+    SELECT 
+      MONTH(a.data_hora) as mes,
+      COUNT(*) as total
+    FROM alertas a
+    JOIN sensores s ON a.sensor = s.identificador
+    WHERE s.usuario_id = ?
+    AND YEAR(a.data_hora) = ?
+    GROUP BY MONTH(a.data_hora)
+    ORDER BY mes
+  `;
+
+  const [rows] = await pool.execute(query, [usuarioId, ano]);
+  return rows;
+}
