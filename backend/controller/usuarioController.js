@@ -5,7 +5,7 @@ class UserController {
 
     async register(req, res) {
         try {
-            const { email, senha, pass } = req.body;
+            const { email, senha, pass, telegram_chat_id } = req.body;
             const password = senha || pass;
 
             if (!email || !password) {
@@ -25,7 +25,7 @@ class UserController {
                 return res.redirect('/cadastro?erro=Email já cadastrado');
             }
 
-            const usuario = await usuarioModel.criar(email, password);
+            const usuario = await usuarioModel.criar(email, password, telegram_chat_id);
 
            if (req.is('json')) {
             // Se o Content-Type é JSON, então é o App Android.
