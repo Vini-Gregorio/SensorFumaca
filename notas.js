@@ -1,0 +1,2 @@
+// No ESP32, colocar
+// http.addHeader("x-api-key", "abc123");
