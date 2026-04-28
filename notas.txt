@@ -1,3 +1,3 @@
 No ESP32, colocar 
   
-http.addHeader("x-api-key", "abc123");
+http.addHeader("x-api-key", "MQFIRE_2026_SENSOR_X9");
