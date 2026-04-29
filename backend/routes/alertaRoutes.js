@@ -44,8 +44,6 @@ router.get("/dashboard", autenticar, async (req, res) => {
   }
 });
 
-export default router;
-
 // 🔥 Buscar por período
 router.get("/periodo", autenticar, async (req, res) => {
   try {
@@ -89,3 +87,5 @@ router.get("/ano", autenticar, async (req, res) => {
     res.status(500).json({ erro: "Erro ao buscar histórico" });
   }
 });
+
+export default router;
