@@ -202,7 +202,15 @@ app.post("/dados", (req, res) => {
 
   try {
     const { sensor, valor, nivel } = req.body;
+
     console.log("📡 Dados recebidos:", sensor, valor, nivel);
+
+    if (Number(valor) < 50) {
+      console.log("Leitura normal, alerta não salvo.");
+      return res.status(200).json({
+        mensagem: "Leitura normal"
+      });
+    }
 
     // Processamento em background (não trava o ESP/Postman)
     (async () => {
