@@ -50,7 +50,7 @@
     async function carregarGrafico() {
       const ano = document.getElementById("ano").value;
 
-      const res = await fetch(`/api/alertas/ano?ano=${ano}`, {
+      const res = await fetch(`/alertas/ano?ano=${ano}`, {
         credentials: "include"
       });
 
