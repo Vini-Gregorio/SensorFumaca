@@ -20,6 +20,7 @@
   },
   "scripts": {
     "start": "node backend/server.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules NODE_ENV=test jest"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules NODE_ENV=test jest",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   }
 }
