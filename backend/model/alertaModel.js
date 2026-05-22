@@ -149,6 +149,25 @@ export async function listarPorSensor(sensorId) {
   return rows;
 }
 
+export async function alertaPertenceAoUsuario(alertaId, usuarioId) {
+  const query = `
+    SELECT 1
+    FROM alertas a
+    JOIN sensores s ON s.identificador = a.sensor
+    WHERE a.id = ? AND s.usuario_id = ?
+    LIMIT 1;
+  `;
+
+  const [rows] = await pool.execute(query, [alertaId, usuarioId]);
+  return rows.length > 0;
+}
+
+export async function marcarResolvido(id) {
+  const query = `UPDATE alertas SET resolvido = 1 WHERE id = ?`;
+  const [result] = await pool.execute(query, [id]);
+  return result.affectedRows > 0;
+}
+
 
 // -----------------------------
 // LISTAR SENSORES + ÚLTIMA LEITURA
@@ -249,4 +268,23 @@ export async function getIntervaloMedio(usuarioId) {
   const minutos = mediaMin % 60;
 
   return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
+}
+
+export async function agruparPorAno(usuarioId, ano) {
+  const query = `
+    SELECT 
+      MONTH(a.data_hora) AS mes,
+      COUNT(*) AS total
+    FROM alertas a
+    JOIN sensores s 
+      ON s.identificador = a.sensor
+    WHERE s.usuario_id = ?
+      AND YEAR(a.data_hora) = ?
+    GROUP BY MONTH(a.data_hora)
+    ORDER BY mes
+  `;
+
+  const [rows] = await pool.execute(query, [usuarioId, ano]);
+
+  return rows;
 }

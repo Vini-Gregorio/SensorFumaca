@@ -1,0 +1,42 @@
+name: MQ-Fire CI/CD Pipeline - HML"
+
+on:
+  push:
+    branches: [ "hml" ]
+  pull_request:
+    branches: [ "hml" ]
+
+jobs:
+  test:
+    name: Executar Testes (Jest)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v3
+
+    - name: Configurar Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '24' # Ajuste para a versão que você usa
+
+    - name: Instalar dependências
+      run: npm install
+
+    - name: Executar testes automatizados
+      run: npm test
+      env:
+        NODE_ENV: test
+        ESP32_TOKEN: "token_fake_para_ci"
+
+  #deploy:
+  #  name: Deploy para o Render
+  #  needs: test # Só executa se a etapa "test" passar!
+  #  runs-on: ubuntu-latest
+  #  if: github.ref == 'refs/heads/hml' && github.event_name == 'push'
+
+  #  steps:
+  #  - name: Acionar Webhook do Render
+      # Você consegue essa URL no painel do Render > Seu Web Service > Settings > Deploy Hook
+  #    run: |
+  #      curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}

@@ -37,14 +37,26 @@ class UsuarioModel {
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
 
     return senhaValida ? usuario : null;
-}
-
-
+    }
+    
     async listarTodos() {
         const query = "SELECT id, email, dataCadastro FROM usuario";
         const [rows] = await pool.execute(query);
         return rows;
     }
-}
 
+
+    async criar(email, senha, telegram_chat_id) {
+        const saltRounds = 10;
+        const senhaHash = await bcrypt.hash(senha, saltRounds);
+
+        const query = `
+            INSERT INTO usuario (email, senha, telegram_chat_id, dataCadastro)
+            VALUES (?, ?, ?, NOW())
+        `;
+
+        const [result] = await pool.execute(query, [email, senhaHash, telegram_chat_id]);
+        return result.insertId;
+    }
+}
 export default new UsuarioModel();
