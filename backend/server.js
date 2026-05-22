@@ -107,7 +107,7 @@ const PORT = process.env.PORT || 3001;
 // Só sobe o servidor na porta se NÃO estiver rodando testes
 if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Servidor rodando na porta ${PORT}!!`);
+        console.log(`Servidor rodando na porta ${PORT}!!!`);
     });
 }
 
