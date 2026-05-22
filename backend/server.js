@@ -231,8 +231,13 @@ app.post("/dados", (req, res) => {
 
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT,  '0.0.0.0', () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-});
 
+// Só sobe o servidor na porta se NÃO estiver rodando testes
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Servidor rodando na porta ${PORT}`);
+    });
+}
+
+// Exporta o app para o Supertest conseguir usá-lo
 export default app;

@@ -1,13 +1,27 @@
+import { jest } from '@jest/globals';
+
+jest.unstable_mockModule('../model/alertaModel.js', () => ({
+  default: {}
+}));
+
+jest.unstable_mockModule('../model/sensor.js', () => ({
+  default: {}
+}));
 import request from 'supertest';
 import app from '../server.js'; // Exporte o app no final do seu server.js: export default app;
 import * as alertaModel from '../model/alertaModel.js';
 import sensorModel from '../model/sensor.js';
 
-// Mockando o banco de dados e o background process
-jest.mock('../model/alertaModel.js');
-jest.mock('../model/sensor.js');
 
 describe('Suíte de Testes - MQ-Fire API', () => {
+
+   test('GET /', async () => {
+
+    const response = await request(app).get('/'); 
+
+    expect(response.statusCode).toBe(200);
+
+  });
 
   beforeEach(() => {
     jest.clearAllMocks(); // Limpa os mocks antes de cada teste para evitar poluição [cite: 128]

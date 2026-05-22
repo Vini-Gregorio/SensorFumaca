@@ -17,5 +17,9 @@
     "cross-env": "^10.1.0",
     "jest": "^30.4.2",
     "supertest": "^7.2.2"
-  }
+  },
+  "scripts": {
+  "start": "node server.js",
+  "test": "cross-env NODE_OPTIONS=--experimental-vm-modules NODE_ENV=test jest"
+}
 }
