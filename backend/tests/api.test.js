@@ -2,11 +2,25 @@ import { jest } from '@jest/globals';
 
 jest.unstable_mockModule('../model/alertaModel.js', () => ({
   addAlerta: jest.fn(),
-  getAlertas: jest.fn()
+  getAlertas: jest.fn(),
+  listarComUltimaLeitura: jest.fn(),
+  listarPorSensor: jest.fn(),
+  listarPorUsuario: jest.fn()
 }));
 
 jest.unstable_mockModule('../model/sensor.js', () => ({
-  default: {}
+  default: {
+    buscarPorIdentificador: jest.fn(),
+    criar: jest.fn()
+  }
+}));
+
+jest.unstable_mockModule('../model/usuario.js', () => ({
+  default: {
+    buscarPorEmail: jest.fn(),
+    verificarCredenciais: jest.fn(),
+    criar: jest.fn()
+  }
 }));
 
 // MOCK DB
@@ -26,9 +40,15 @@ const { default: app } =
 const alertaModel =
   await import('../model/alertaModel.js');
 
-describe('Suíte de Testes - MQ-Fire API', () => {
+const usuarioModel =
+  await import('../model/usuario.js');
 
-   test('GET /', async () => {
+describe('Suíte de Testes - MQ-Fire API', () => {
+  beforeEach(() => {
+    jest.clearAllMocks(); // Limpa os mocks antes de cada teste para evitar poluição [cite: 128]
+  });
+
+  test('GET /', async () => {
 
     const response = await request(app).get('/'); 
 
@@ -36,13 +56,9 @@ describe('Suíte de Testes - MQ-Fire API', () => {
     expect(response.headers.location).toBe('/inicio'); //verifica o local do redirecionamento
 
   });
-
-  beforeEach(() => {
-    jest.clearAllMocks(); // Limpa os mocks antes de cada teste para evitar poluição [cite: 128]
-  });
-
+  
   // Refere-se ao CT-01 e CT-02 [cite: 52, 68]
-  describe('POST /dados - Recepção de Telemetria do ESP32', () => {
+  describe('POST /api/esp32 - Recepção de Telemetria do ESP32', () => {
     
     it('CT-01: Deve processar alerta vermelho e acionar background', async () => {
       const alertaModel = await import('../model/alertaModel.js');
@@ -53,12 +69,13 @@ describe('Suíte de Testes - MQ-Fire API', () => {
       const payload = { sensor: "esp32_sala_01", valor: 85, nivel: "vermelho" };
 
       const response = await request(app)
-        .post('/dados')
-        .set('x-api-key', process.env.ESP32_TOKEN) // Requisito do seu server.js
+        .post('/api/esp32')
+        .set('x-api-key', process.env.ESP32_TOKEN)
         .send(payload);
 
       expect(response.status).toBe(200);
-      expect(response.body.mensagem).toBe("Recebido");
+      expect(response.body.sucesso).toBe(true);
+      expect(response.body.mensagem).toContain("Dados recebidos");
       // Verifica se a função background foi chamada corretamente
       expect(alertaModel.addAlerta).toHaveBeenCalledWith("esp32_sala_01", 85, "vermelho");
     });
@@ -67,12 +84,77 @@ describe('Suíte de Testes - MQ-Fire API', () => {
       const payload = { sensor: "esp32_sala_01", valor: 40 };
 
       const response = await request(app)
-        .post('/dados')
+        .post('/api/esp32')
         .set('x-api-key', 'token_errado')
         .send(payload);
 
-      expect(response.status).toBe(401); // 401 Unauthorized do seu server.js
+      expect(response.status).toBe(401);
+      expect(response.body.sucesso).toBe(false);
       expect(response.body.erro).toBe("Token inválido");
+    });
+  });
+  // Refere-se ao CT-03: Duplicidade de sensor
+  describe('API Mobile - Cadastro e Validação', () => {
+    
+    it('CT-03: Deve bloquear cadastro de usuário duplicado via JSON', async () => {
+      const usuario = usuarioModel.default;
+      usuario.buscarPorEmail.mockResolvedValue({ id: 1, email: 'teste@email.com' });
+
+      const payload = { email: 'teste@email.com', senha: 'senha123' };
+
+      const response = await request(app)
+        .post('/usuarios/register')
+        .set('Content-Type', 'application/json')
+        .send(payload);
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('Email já cadastrado');
+    });
+  });
+
+  // Refere-se ao CT-04: Credenciais inválidas
+  describe('POST /usuarios/login - Autenticação', () => {
+
+    it('CT-04: Deve bloquear acesso com credenciais inválidas', async () => {
+      usuarioModel.default.verificarCredenciais.mockResolvedValue(null);
+
+      const payload = { email: "teste@email.com", senha: "senha_errada" };
+
+      const response = await request(app)
+        .post('/usuarios/login')
+        .set('Content-Type', 'application/json')
+        .send(payload);
+
+      expect(response.status).toBe(401);
+      expect(response.body.error).toBe('Email ou senha inválidos');
+    });
+  });
+
+  // Refere-se ao CT-05: Interoperabilidade
+  describe('GET /api/mobile/sensores - Interoperabilidade Multiplataforma', () => {
+    
+    it('CT-05: Rota Mobile deve retornar JSON estrito e não redirecionar quando não autenticado', async () => {
+      const response = await request(app)
+        .get('/api/mobile/sensores')
+        .set('Accept', 'application/json');
+
+      expect(response.status).toBe(401);
+      expect(response.type).toMatch(/json/);
+      expect(response.body.sucesso).toBe(false);
+      expect(response.body.error).toBe('Não autorizado');
+    });
+  });
+
+  describe('GET /api/web/sensores - Interoperabilidade Web', () => {
+    it('CT-06: Rota Web deve retornar JSON de erro ao não estar autenticado', async () => {
+      const response = await request(app)
+        .get('/api/web/sensores')
+        .set('Accept', 'application/json');
+
+      expect(response.status).toBe(401);
+      expect(response.type).toMatch(/json/);
+      expect(response.body.sucesso).toBe(false);
+      expect(response.body.error).toBe('Não autorizado');
     });
   });
 
