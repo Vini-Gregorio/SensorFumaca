@@ -1,17 +1,30 @@
 import { jest } from '@jest/globals';
 
 jest.unstable_mockModule('../model/alertaModel.js', () => ({
-  default: {}
+  addAlerta: jest.fn(),
+  getAlertas: jest.fn()
 }));
 
 jest.unstable_mockModule('../model/sensor.js', () => ({
   default: {}
 }));
-import request from 'supertest';
-import app from '../server.js'; // Exporte o app no final do seu server.js: export default app;
-import * as alertaModel from '../model/alertaModel.js';
-import sensorModel from '../model/sensor.js';
 
+// MOCK DB
+jest.unstable_mockModule('../config/db.js', () => ({
+  default: {
+    query: jest.fn(),
+    execute: jest.fn(),
+    getConnection: jest.fn()
+  }
+}));
+
+const request = (await import('supertest')).default;
+
+const { default: app } =
+  await import('../server.js');
+
+const alertaModel =
+  await import('../model/alertaModel.js');
 
 describe('Suíte de Testes - MQ-Fire API', () => {
 
@@ -19,7 +32,8 @@ describe('Suíte de Testes - MQ-Fire API', () => {
 
     const response = await request(app).get('/'); 
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(302); //redirecionamento para /inicio
+    expect(response.headers.location).toBe('/inicio'); //verifica o local do redirecionamento
 
   });
 
@@ -31,8 +45,10 @@ describe('Suíte de Testes - MQ-Fire API', () => {
   describe('POST /dados - Recepção de Telemetria do ESP32', () => {
     
     it('CT-01: Deve processar alerta vermelho e acionar background', async () => {
+      const alertaModel = await import('../model/alertaModel.js');
       // Mock da função que salva o alerta e dispara telegram
       alertaModel.addAlerta.mockResolvedValue(true); 
+      
 
       const payload = { sensor: "esp32_sala_01", valor: 85, nivel: "vermelho" };
 
