@@ -1,10 +1,10 @@
-name: MQ-Fire CI/CD Pipeline - PROD"
+name: MQ-Fire CI/CD Pipeline - HML"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "hml" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "hml" ]
 
 jobs:
   test:
