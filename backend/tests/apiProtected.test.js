@@ -69,7 +69,7 @@ describe('APIs Mobile e Web com autenticação simulada', () => {
   });
 
   it('GET /api/web/sensores/:id deve retornar detalhe e histórico quando existir', async () => {
-    sensorModel.default.buscarPorIdentificador.mockResolvedValue({ identificador: 'sensor1', nomeSala: 'Sala 1' });
+    sensorModel.default.buscarPorIdentificador.mockResolvedValue({ identificador: 'sensor1', nomeSala: 'Sala 1', usuario_id: 1 });
     alertaModel.listarPorSensor.mockResolvedValue([
       { valor: 80, nivel: 'alto', data_hora: '2026-01-01 12:00:00' }
     ]);

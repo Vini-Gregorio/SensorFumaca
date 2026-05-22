@@ -1,5 +1,5 @@
 export const autenticar = (req, res, next) => {
-    if (req.session && req.session.usuario) {
+    if (req.session?.usuario) {
         return next();
     }
 

@@ -40,20 +40,34 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname, '..', 'views')));
 
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
+    next();
+});
+
 app.use(session({
-    secret: 'chavemuitoSecreta', 
+    secret: process.env.SESSION_SECRET || 'chavemuitoSecreta',
     resave: false,
     saveUninitialized: false,
-    cookie: { 
-        secure: false,           
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
         maxAge: 1000 * 60 * 60 * 24 // 24 horas
     }
 }));
 
-// Debug (apenas em desenvolvimento)
-app.get("/debug", (req, res) => {
-    res.json(req.session);
-});
+if (process.env.NODE_ENV === 'development') {
+    app.get("/debug", (req, res) => {
+        res.json(req.session);
+    });
+}
 
 // ============= ROTAS =============
 

@@ -33,11 +33,12 @@ router.get('/sensores', autenticar, async (req, res) => {
 // GET /api/web/sensores/:id - Detalhe sensor com histórico
 router.get('/sensores/:id', autenticar, async (req, res) => {
   const sensorId = req.params.id;
+  const usuarioId = req.session.usuario.id;
 
   try {
     const sensor = await sensorModel.buscarPorIdentificador(sensorId);
 
-    if (!sensor) {
+    if (!sensor || sensor.usuario_id !== usuarioId) {
       return res.status(404).json({ 
         sucesso: false,
         erro: 'Sensor não encontrado' 
@@ -78,6 +79,13 @@ router.get('/alertas', autenticar, async (req, res) => {
   const { sensorId } = req.query;
 
   try {
+    if (sensorId) {
+      const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+      if (!sensor || sensor.usuario_id !== usuarioId) {
+        return res.status(403).json({ sucesso: false, erro: 'Acesso negado' });
+      }
+    }
+
     const alertas = sensorId
       ? await alertaModel.listarPorSensor(sensorId)
       : await alertaModel.listarPorUsuario(usuarioId);

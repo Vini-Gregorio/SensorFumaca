@@ -4,10 +4,10 @@ import sensorController from "../controller/sensorController.js";
 
 const router = express.Router();
 
-router.post("/register", sensorController.registerSensorWeb);
-router.post("api/register", sensorController.registerSensorApi);
-// lista todos (GET /sensores) — opcional
-router.get("/", sensorController.listar);
+router.post("/register", autenticar, sensorController.registerSensorWeb);
+router.post("/api/register", autenticar, sensorController.registerSensorApi);
+// lista todos (GET /sensores)
+router.get("/", autenticar, sensorController.listar);
 router.put("/:id", autenticar, sensorController.atualizar);
 router.delete("/:id", autenticar, sensorController.deletar);
 

@@ -149,6 +149,25 @@ export async function listarPorSensor(sensorId) {
   return rows;
 }
 
+export async function alertaPertenceAoUsuario(alertaId, usuarioId) {
+  const query = `
+    SELECT 1
+    FROM alertas a
+    JOIN sensores s ON s.identificador = a.sensor
+    WHERE a.id = ? AND s.usuario_id = ?
+    LIMIT 1;
+  `;
+
+  const [rows] = await pool.execute(query, [alertaId, usuarioId]);
+  return rows.length > 0;
+}
+
+export async function marcarResolvido(id) {
+  const query = `UPDATE alertas SET resolvido = 1 WHERE id = ?`;
+  const [result] = await pool.execute(query, [id]);
+  return result.affectedRows > 0;
+}
+
 
 // -----------------------------
 // LISTAR SENSORES + ÚLTIMA LEITURA

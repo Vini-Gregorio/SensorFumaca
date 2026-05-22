@@ -1,15 +1,27 @@
 import express from 'express';
 import { autenticar } from '../auth.js';
 import * as alertaModel from '../model/alertaModel.js';
+import sensorModel from '../model/sensor.js';
 
 const router = express.Router();
 
 // Lista alertas do usuário ou de um sensor específico
 router.get('/', autenticar, async (req, res) => {
-  const usuarioId = req.session.userId || (req.session.usuario && req.session.usuario.id);
+  const usuarioId = req.session?.usuario?.id;
   const { sensorId } = req.query;
 
+  if (!usuarioId) {
+    return res.status(401).json({ erro: 'Não autorizado' });
+  }
+
   try {
+    if (sensorId) {
+      const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+      if (!sensor || sensor.usuario_id !== usuarioId) {
+        return res.status(403).json({ erro: 'Acesso negado' });
+      }
+    }
+
     const alertas = sensorId
       ? await alertaModel.listarPorSensor(sensorId)
       : await alertaModel.listarPorUsuario(usuarioId);
