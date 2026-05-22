@@ -25,6 +25,8 @@ import { autenticar } from './auth.js';
 
 
 
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -49,6 +51,11 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 // 24 horas
     }
 }));
+//teste 
+app.get("/debug", (req, res) => {
+    res.json(req.session);
+});
+
 
 // Debug (apenas em desenvolvimento)
 app.get("/debug", (req, res) => {
