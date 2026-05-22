@@ -1,4 +1,4 @@
-name: MQ-Fire CI/CD Pipeline
+name: MQ-Fire CI/CD Pipeline - PROD"
 
 on:
   push:
@@ -29,14 +29,14 @@ jobs:
         NODE_ENV: test
         ESP32_TOKEN: "token_fake_para_ci"
 
-  deploy:
-    name: Deploy para o Render
-    needs: test # Só executa se a etapa "test" passar!
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #deploy:
+  #  name: Deploy para o Render
+  #  needs: test # Só executa se a etapa "test" passar!
+  #  runs-on: ubuntu-latest
+  #  if: github.ref == 'refs/heads/hml' && github.event_name == 'push'
 
-    steps:
-    - name: Acionar Webhook do Render
+  #  steps:
+  #  - name: Acionar Webhook do Render
       # Você consegue essa URL no painel do Render > Seu Web Service > Settings > Deploy Hook
-      run: |
-        curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+  #    run: |
+  #      curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
