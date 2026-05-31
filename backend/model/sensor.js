@@ -21,6 +21,15 @@ class SensorModel {
         return rows.length > 0 ? rows[0] : null;
     }
 
+    async buscarPorIdentificadorOuId(value) {
+        const id = Number(value);
+        if (!Number.isNaN(id)) {
+            const sensorById = await this.buscarPorId(id);
+            if (sensorById) return sensorById;
+        }
+        return this.buscarPorIdentificador(value);
+    }
+
     async listarPorUsuario(usuarioId) {
         const query = "SELECT * FROM sensores WHERE usuario_id = ?";
         const [rows] = await pool.execute(query, [usuarioId]);

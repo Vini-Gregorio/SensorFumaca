@@ -58,5 +58,11 @@ class UsuarioModel {
         const [result] = await pool.execute(query, [email, senhaHash, telegram_chat_id]);
         return result.insertId;
     }
+
+    async atualizarTelegramChatId(usuarioId, telegram_chat_id) {
+        const query = "UPDATE usuario SET telegram_chat_id = ? WHERE id = ?";
+        const [result] = await pool.execute(query, [telegram_chat_id, usuarioId]);
+        return result.affectedRows > 0;
+    }
 }
 export default new UsuarioModel();

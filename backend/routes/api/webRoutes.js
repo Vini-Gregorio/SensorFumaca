@@ -36,7 +36,7 @@ router.get('/sensores/:id', autenticar, async (req, res) => {
   const usuarioId = req.session.usuario.id;
 
   try {
-    const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+    const sensor = await sensorModel.buscarPorIdentificadorOuId(sensorId);
 
     if (!sensor || sensor.usuario_id !== usuarioId) {
       return res.status(404).json({ 
@@ -45,7 +45,7 @@ router.get('/sensores/:id', autenticar, async (req, res) => {
       });
     }
 
-    const alertas = await alertaModel.listarPorSensor(sensor.identificador); 
+    const alertas = await alertaModel.listarPorSensor(sensor.id);
     
     if (alertas && alertas.length > 0) {
         const ultimo = alertas[0];
@@ -80,14 +80,15 @@ router.get('/alertas', autenticar, async (req, res) => {
 
   try {
     if (sensorId) {
-      const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+      const sensor = await sensorModel.buscarPorIdentificadorOuId(sensorId);
       if (!sensor || sensor.usuario_id !== usuarioId) {
         return res.status(403).json({ sucesso: false, erro: 'Acesso negado' });
       }
     }
 
-    const alertas = sensorId
-      ? await alertaModel.listarPorSensor(sensorId)
+    const sensor = sensorId ? await sensorModel.buscarPorIdentificadorOuId(sensorId) : null;
+    const alertas = sensorId && sensor
+      ? await alertaModel.listarPorSensor(sensor.id)
       : await alertaModel.listarPorUsuario(usuarioId);
     
     res.json({

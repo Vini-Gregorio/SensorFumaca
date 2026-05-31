@@ -109,6 +109,30 @@ class UserController {
             res.redirect('/entrar');
         });
     }
+
+    async atualizarTelegramChatId(req, res) {
+        try {
+            const usuarioId = req.session.usuario?.id;
+            if (!usuarioId) {
+                return res.status(401).json({ error: 'Usuário não autenticado' });
+            }
+
+            const { telegram_chat_id } = req.body;
+            if (!telegram_chat_id) {
+                return res.status(400).json({ error: 'telegram_chat_id é obrigatório' });
+            }
+
+            const atualizado = await usuarioModel.atualizarTelegramChatId(usuarioId, telegram_chat_id);
+            if (!atualizado) {
+                return res.status(500).json({ error: 'Não foi possível atualizar o telegram_chat_id' });
+            }
+
+            return res.status(200).json({ sucesso: true, mensagem: 'Telegram Chat ID atualizado com sucesso' });
+        } catch (error) {
+            console.error('Erro ao atualizar telegram_chat_id:', error);
+            return res.status(500).json({ error: 'Erro ao atualizar telegram_chat_id' });
+        }
+    }
 }
 
 

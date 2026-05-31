@@ -10,6 +10,7 @@ router.post("/login", userController.login);
 router.get("/me", autenticar, (req, res) => {
   res.json(req.session.usuario);
 });
+router.patch("/telegram", autenticar, userController.atualizarTelegramChatId);
 
 // Aliases para compatibilidade com frontend (rotas legadas)
 router.post("/cadastro", userController.register);  // /usuarios/cadastro

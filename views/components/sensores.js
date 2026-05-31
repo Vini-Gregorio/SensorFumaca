@@ -107,17 +107,18 @@ function formatarTempoUltimaLeitura(timestamp) {
 
 
 function criarCardSensor(sensor) {
-      // sensor.leituraPPM = valor (número ou null)
-    // sensor.ultimaLeitura = timestamp (string, number ou Date)
-    const status = determinarStatusComTempo(sensor.leituraPPM, sensor.ultimaLeitura);
+    const valor = sensor.leituraPPM ?? sensor.valor ?? 0;
+    const status = determinarStatusComTempo(valor, sensor.ultimaLeitura);
     const tempoFormatado = formatarTempoUltimaLeitura(sensor.ultimaLeitura);
-    
+    const nivel = sensor.nivel || 'Sem dados';
+    const sensorNome = sensor.nome || sensor.codigo || 'Sensor';
+
     return `
         <a href="visualizacaoSensor.html?local_id=${sensor.id}" 
            class="block bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 transform hover:-translate-y-1 border-t-4 ${status.borda}">
             <div class="p-6">
                 <div class="flex justify-between items-start mb-4">
-                    <h2 class="text-2xl font-semibold text-gray-800">${sensor.nome}</h2>
+                    <h2 class="text-2xl font-semibold text-gray-800">${sensorNome}</h2>
                     <div class="flex items-center gap-2 ${status.texto} font-bold">
                         <div class="w-4 h-4 rounded-full ${status.bg}"></div>
                         <span>${status.status}</span>
@@ -126,12 +127,15 @@ function criarCardSensor(sensor) {
                 
                 <p class="text-sm text-gray-500 mb-4">Sensor: ${sensor.codigo}</p>
 
-                <div class="pt-2 border-t border-gray-100">
-                    <p class="text-gray-700">Último alerta: 
-                        <span class="font-bold ${status.texto}">${sensor.leituraPPM} PPM</span>
+                <div class="pt-2 border-t border-gray-100 space-y-2">
+                    <p class="text-gray-700">Última leitura: 
+                        <span class="font-bold ${status.texto}">${valor != null ? `${valor} PPM` : '—'}</span>
                     </p>
-                    <p class="${(sensor.leituraPPM ?? 0) > 100 ? 'text-red-500 font-semibold' : 'text-gray-500'} text-sm">
-                    Captado : ${tempoFormatado}
+                    <p class="text-gray-700">Nível: 
+                        <span class="font-semibold ${nivel === 'vermelho' ? 'text-red-500' : nivel === 'amarelo' ? 'text-yellow-500' : 'text-green-500'}">${nivel}</span>
+                    </p>
+                    <p class="${valor > 100 ? 'text-red-500 font-semibold' : 'text-gray-500'} text-sm">
+                        Captado: ${tempoFormatado}
                     </p>
                 </div>
             </div>
@@ -143,14 +147,17 @@ function criarCardSensor(sensor) {
 
    async function carregarSensores() {
     try {
-        credentials: "include"
-        const resposta = await fetch("/api/sensores"); // já leva o cookie da sessão
+        const resposta = await fetch("/api/web/sensores", { credentials: "include" }); // já leva o cookie da sessão
         if (!resposta.ok) {
             throw new Error("Erro ao buscar sensores (talvez não logado)");
         }
-         
 
-        const sensores = await resposta.json();
+        const dados = await resposta.json();
+        if (!dados || !dados.sucesso) {
+            throw new Error(dados?.erro || "Erro ao buscar sensores");
+        }
+
+        const sensores = dados.dados || [];
 
         const grid = document.getElementById("sensores-grid");
           if (!grid) {
@@ -164,11 +171,12 @@ function criarCardSensor(sensor) {
         }
 
         grid.innerHTML = sensores.map(s => criarCardSensor({
-            id: s.identificador,
+            id: s.id,
             nome: s.nomeSala,
             codigo: s.identificador,
             leituraPPM: s.ultima_leitura,
-            ultimaLeitura: s.data_hora // ainda não temos a data real
+            nivel: s.nivel,
+            ultimaLeitura: s.data_hora
         })).join("");
 
     } catch (erro) {
@@ -198,7 +206,7 @@ async function carregarHistorico() {
 
     try {
         // buscar histórico
-        const resposta = await fetch(`/api/alertas?sensorId=${encodeURIComponent(sensorId)}`, { credentials: "include" });
+        const resposta = await fetch(`/api/web/alertas?sensorId=${encodeURIComponent(sensorId)}`, { credentials: "include" });
 
         if (!resposta.ok) {
             console.error("Erro na resposta da API (histórico):", resposta.status, await resposta.text());
@@ -206,24 +214,22 @@ async function carregarHistorico() {
             return;
         }
 
-        const dados = await resposta.json();
+        const payload = await resposta.json();
+        const alertas = payload?.dados || [];
 
         // se não tem alertas, busca nome do sensor e atualiza título, mostra mensagem amigável
-        if (!Array.isArray(dados) || dados.length === 0) {
+        if (!Array.isArray(alertas) || alertas.length === 0) {
             // tenta buscar meta do sensor
             try {
-                const r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
+                const r2 = await fetch(`/api/web/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
                 if (r2.ok) {
                     const sensorInfo = await r2.json();
-                    // atualizar título com nome da sala (ou identificador se nome faltar)
-                    const salaNome = sensorInfo.nomeSala || sensorInfo.identificador || sensorId;
+                    const salaNome = sensorInfo?.dados?.nomeSala || sensorInfo?.dados?.identificador || sensorId;
                     tituloSala.innerHTML = `Status do<br>Sensor ${sensorId} (${salaNome})`;
                 } else {
-                    // se não achou, apenas coloca identificador
                     tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
                 }
             } catch (errSensor) {
-                // erro ao buscar sensor -> mesmo assim atualiza com identificador
                 tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
                 console.warn("Não foi possível buscar info do sensor:", errSensor);
             }
@@ -234,22 +240,20 @@ async function carregarHistorico() {
             return;
         }
 
-        // existem alertas -> preencher normalmenteconst r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
-               const r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
-                if (r2.ok) {
-                    const sensorInfo = await r2.json();
-                    // atualizar título com nome da sala (ou identificador se nome faltar)
-                    const salaNome = sensorInfo.nomeSala || sensorInfo.identificador || sensorId;
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId} (${salaNome})`;
-                } else {
-                    // se não achou, apenas coloca identificador
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
-                }
+        // existem alertas -> preencher normalmente
+        const r2 = await fetch(`/api/web/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
+        if (r2.ok) {
+            const sensorInfo = await r2.json();
+            const salaNome = sensorInfo?.dados?.nomeSala || sensorInfo?.dados?.identificador || sensorId;
+            tituloSala.innerHTML = `Status do<br>Sensor ${sensorId} (${salaNome})`;
+        } else {
+            tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
+        }
 
-        valorAtualDiv.textContent = dados[0].valor ?? "-";
-        if (valorDatahora) valorDatahora.textContent = dados[0].data_hora ? new Date(dados[0].data_hora).toLocaleString("pt-BR") : "-";
+        valorAtualDiv.textContent = alertas[0].valor ?? "-";
+        if (valorDatahora) valorDatahora.textContent = alertas[0].data_hora ? new Date(alertas[0].data_hora).toLocaleString("pt-BR") : "-";
 
-        tabelaBody.innerHTML = dados.map(alerta => `
+        tabelaBody.innerHTML = alertas.map(alerta => `
             <tr class="text-gray-700 text-sm md:text-base">
                 <td class="py-2 pr-4">${alerta.id ?? "-"}</td>
                 <td class="py-2 px-4 ${alerta.nivel === 'vermelho' ? 'text-red-500' : alerta.nivel === 'amarelo' ? 'text-yellow-500' : 'text-green-500'} font-medium">

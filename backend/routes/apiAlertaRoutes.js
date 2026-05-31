@@ -15,15 +15,16 @@ router.get('/', autenticar, async (req, res) => {
   }
 
   try {
+    let sensor = null;
     if (sensorId) {
-      const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+      sensor = await sensorModel.buscarPorIdentificadorOuId(sensorId);
       if (!sensor || sensor.usuario_id !== usuarioId) {
         return res.status(403).json({ erro: 'Acesso negado' });
       }
     }
 
-    const alertas = sensorId
-      ? await alertaModel.listarPorSensor(sensorId)
+    const alertas = sensorId && sensor
+      ? await alertaModel.listarPorSensor(sensor.id)
       : await alertaModel.listarPorUsuario(usuarioId);
     res.json(alertas);
   } catch (err) {

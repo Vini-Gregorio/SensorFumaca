@@ -6,8 +6,8 @@
 // =======================
 // CONFIGURAÇÕES
 // =======================
-const char* ssid = "wifi";
-const char* password = "senha";
+const char* ssid = "view";
+const char* password = "pamonha33";
 
 const char* apiUrl = "mqfire.onrender.com:3001/api/esp32";
 const char* apiKey = "MQFIRE_2026_SENSOR_X9";

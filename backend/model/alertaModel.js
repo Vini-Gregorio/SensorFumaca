@@ -4,12 +4,17 @@ import { sendTelegramMessage } from "../utils/telegram.js";
 // LISTAR ALERTAS POR USUÁRIO
 export async function getAlertas(usuarioId) {
   const query = `
-SELECT * 
-    FROM alertas 
-    join sensores on sensores.identificador = alertas.sensor
-    join usuario on usuario_id = sensores.usuario_id
-    WHERE sensores.usuario_id = ?
-    ORDER BY alertas.data_hora DESC;
+SELECT a.id,
+       s.identificador AS sensor,
+       a.valor,
+       a.nivel,
+       a.data_hora,
+       s.nomeSala AS sala
+FROM alertas a
+JOIN sensores s ON s.id = a.sensor_id
+JOIN usuario u ON u.id = s.usuario_id
+WHERE s.usuario_id = ?
+ORDER BY a.data_hora DESC;
   `;
   const [rows] = await pool.execute(query, [usuarioId]);
   return rows;
@@ -22,11 +27,25 @@ SELECT *
 
 // addAlerta instrumentado: salva, tenta notificar e persiste falhas
 export async function addAlerta(sensor, valor, nivel) {
+  const [sensorRow] = await pool.execute(
+    `SELECT id, identificador, nomeSala, usuario_id FROM sensores WHERE identificador = ? LIMIT 1`,
+    [sensor]
+  );
+
+  if (!sensorRow || sensorRow.length === 0) {
+    throw new Error(`Sensor não encontrado: ${sensor}`);
+  }
+
+  const sensorId = sensorRow[0].id;
+  const sensorIdentificador = sensorRow[0].identificador;
+  const sensorSala = sensorRow[0].nomeSala;
+  const usuarioId = sensorRow[0].usuario_id;
+
   // 1) salva alerta
-  const insertQuery = `INSERT INTO alertas (sensor, valor, nivel) VALUES (?, ?, ?)`;
-  const [result] = await pool.execute(insertQuery, [sensor, valor, nivel]);
+  const insertQuery = `INSERT INTO alertas (sensor_id, valor, nivel) VALUES (?, ?, ?)`;
+  const [result] = await pool.execute(insertQuery, [sensorId, valor, nivel]);
   const insertedId = result.insertId;
-  console.log(`addAlerta: alerta salvo id=${insertedId} sensor=${sensor} valor=${valor} nivel=${nivel}`);
+  console.log(`addAlerta: alerta salvo id=${insertedId} sensor=${sensorIdentificador} valor=${valor} nivel=${nivel}`);
 
   // 2) decide se notifica
   try {
@@ -34,17 +53,15 @@ export async function addAlerta(sensor, valor, nivel) {
     console.log("addAlerta: nivelNormalized =", nivelNormalized);
 
     if (nivelNormalized === 'vermelho' || nivelNormalized === 'alto') {
-      // busca chat do dono do sensor
+      // busca chat do dono do sensor usando o usuario_id já obtido
       const q = `
-        SELECT u.telegram_chat_id, u.email, s.nomeSala AS sala
-        FROM sensores s
-        JOIN usuario u ON u.id = s.usuario_id
-        WHERE s.identificador = ?
+        SELECT telegram_chat_id, email
+        FROM usuario
+        WHERE id = ?
         LIMIT 1
       `;
-      const [rows] = await pool.execute(q, [sensor]);
+      const [rows] = await pool.execute(q, [usuarioId]);
       const dbChatId = rows?.[0]?.telegram_chat_id ?? null;
-      const sala = rows?.[0]?.sala ?? '(sala desconhecida)';
       const fallbackChatId = process.env.TELEGRAM_CHAT_ID && process.env.TELEGRAM_CHAT_ID.trim() !== ""
         ? process.env.TELEGRAM_CHAT_ID.trim()
         : null;
@@ -52,7 +69,7 @@ export async function addAlerta(sensor, valor, nivel) {
 
       //console.log("addAlerta: dbChatId =", dbChatId, "fallback =", fallbackChatId, "=> using:", chatId);
 
-      console.log("addAlerta: dbChatId =", dbChatId, "sala =", sala, "fallback =", fallbackChatId, "=> using:", chatId);
+      console.log("addAlerta: dbChatId =", dbChatId, "sala =", sensorSala, "fallback =", fallbackChatId, "=> using:", chatId);
 
       if (!chatId) {
         console.warn("addAlerta: nenhum chatId disponível — registro de falha será criado");
@@ -64,9 +81,7 @@ export async function addAlerta(sensor, valor, nivel) {
         return insertedId;
       }
 
-      // monta mensagem (cuidado com HTML se conteúdo vier do dispositivo)
-      //const mensagem = `<b>⚠️ ALARME VERMELHO</b>\nSensor: <code>${sensor}</code>\nValor: <b>${valor}</b>\nNível: <b>${nivel}</b>\nID alerta: ${insertedId}\n${new Date().toLocaleString('pt-BR')}`;
-      const mensagem = `⚠️ *ALARME VERMELHO*\nSala: ${sala}\nSensor: ${sensor}\nValor: ${valor}\nNível: ${nivel}\nID: ${insertedId}\n${new Date().toLocaleString('pt-BR')}`;
+      const mensagem = `⚠️ *ALARME VERMELHO*\nSala: ${sensorSala || '(sala desconhecida)'}\nSensor: ${sensorIdentificador}\nValor: ${valor}\nNível: ${nivel}\nID: ${insertedId}\n${new Date().toLocaleString('pt-BR')}`;
       // 3) tenta enviar e guarda resultado
       const envio = await sendTelegramMessage(chatId, mensagem);
       console.log("addAlerta: resultado envio telegram:", envio);
@@ -110,17 +125,17 @@ export async function listarPorUsuario(usuarioId) {
   const query = `
     SELECT 
         a.id,
-        a.sensor,
+        s.identificador AS sensor,
         a.valor,
         a.nivel,
         a.data_hora,
-        S.nomeSala AS sala,
-        S.identificador
+        s.nomeSala AS sala,
+        s.identificador
     FROM alertas a
-    INNER JOIN sensores S 
-        ON S.identificador = a.sensor
+    INNER JOIN sensores s 
+        ON s.id = a.sensor_id
     INNER JOIN usuario u 
-        ON u.id = S.usuario_id
+        ON u.id = s.usuario_id
     WHERE u.id = ?
     ORDER BY a.data_hora DESC;
   `;
@@ -135,14 +150,16 @@ export async function listarPorUsuario(usuarioId) {
 export async function listarPorSensor(sensorId) {
   const query = `
     SELECT 
-        id,
-        sensor,
-        valor,
-        nivel,
-        data_hora
-    FROM alertas
-    WHERE sensor = ?
-    ORDER BY data_hora DESC;
+        a.id,
+        s.identificador AS sensor,
+        a.valor,
+        a.nivel,
+        a.data_hora
+    FROM alertas a
+    INNER JOIN sensores s
+        ON s.id = a.sensor_id
+    WHERE a.sensor_id = ?
+    ORDER BY a.data_hora DESC;
   `;
 
   const [rows] = await pool.execute(query, [sensorId]);
@@ -153,7 +170,7 @@ export async function alertaPertenceAoUsuario(alertaId, usuarioId) {
   const query = `
     SELECT 1
     FROM alertas a
-    JOIN sensores s ON s.identificador = a.sensor
+    JOIN sensores s ON s.id = a.sensor_id
     WHERE a.id = ? AND s.usuario_id = ?
     LIMIT 1;
   `;
@@ -185,7 +202,7 @@ export async function listarComUltimaLeitura(usuarioId) {
     LEFT JOIN alertas a 
         ON a.id = (
           SELECT id FROM alertas 
-          WHERE sensor = S.identificador 
+          WHERE sensor_id = S.id 
           ORDER BY data_hora DESC LIMIT 1
         )
     WHERE S.usuario_id = ?
@@ -199,7 +216,7 @@ export async function listarComUltimaLeitura(usuarioId) {
 export async function listarPorData(usuarioId) {
   const query = `
     SELECT a.* FROM alertas a
-    JOIN sensores s ON a.sensor = s.identificador
+    JOIN sensores s ON a.sensor_id = s.id
     WHERE s.usuario_id = ? AND DATE(a.data_hora) = CURDATE()
   `;
   const [rows] = await pool.execute(query, [usuarioId]);
@@ -208,9 +225,9 @@ export async function listarPorData(usuarioId) {
 
 export async function listarSensoresEmAlerta(usuarioId) {
   const query = `
-    SELECT a.sensor, a.valor, a.data_hora
+    SELECT s.identificador AS sensor, a.valor, a.data_hora
     FROM alertas a
-    JOIN sensores s ON a.sensor = s.identificador
+    JOIN sensores s ON a.sensor_id = s.id
     WHERE s.usuario_id = ?
     ORDER BY a.data_hora DESC
   `;
@@ -247,7 +264,7 @@ export async function getIntervaloMedio(usuarioId) {
   const query = `
     SELECT a.data_hora 
     FROM alertas a
-    JOIN sensores s ON a.sensor = s.identificador
+    JOIN sensores s ON a.sensor_id = s.id
     WHERE s.usuario_id = ?
     ORDER BY a.data_hora ASC
   `;
@@ -277,7 +294,7 @@ export async function agruparPorAno(usuarioId, ano) {
       COUNT(*) AS total
     FROM alertas a
     JOIN sensores s 
-      ON s.identificador = a.sensor
+      ON s.id = a.sensor_id
     WHERE s.usuario_id = ?
       AND YEAR(a.data_hora) = ?
     GROUP BY MONTH(a.data_hora)

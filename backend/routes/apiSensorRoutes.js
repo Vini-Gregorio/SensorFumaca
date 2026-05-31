@@ -23,13 +23,13 @@ router.get('/:id', async (req, res) => {
   const sensorId = req.params.id;
 
   try {
-    const sensor = await sensorModel.buscarPorIdentificador(sensorId);
+    const sensor = await sensorModel.buscarPorIdentificadorOuId(sensorId);
 
     if (!sensor) {
       return res.status(404).json({ erro: 'Sensor não encontrado' });
     }
 
-    const alertas = await alertaModel.listarPorSensor(sensor.identificador); 
+    const alertas = await alertaModel.listarPorSensor(sensor.id);
     
     if (alertas && alertas.length > 0) {
         const ultimo = alertas[0];
