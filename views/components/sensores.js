@@ -141,34 +141,37 @@ function criarCardSensor(sensor) {
 
 // exemplos de dados de sensores, enquanto não ha banco
 
-   async function carregarSensores() {
+async function carregarSensores() {
     try {
-        credentials: "include"
-        const resposta = await fetch("/api/sensores"); // já leva o cookie da sessão
-        if (!resposta.ok) {
-            throw new Error("Erro ao buscar sensores (talvez não logado)");
-        }
-         
+        const resposta = await fetch("/api/web/sensores", {
+            credentials: "include"
+        });
 
-        const sensores = await resposta.json();
+        if (!resposta.ok) {
+            throw new Error("Erro ao buscar sensores (status: " + resposta.status + ")");
+        }
+
+        const dados = await resposta.json();
+
+        // Se a API retornar um objeto encapsulado (ex: { sensores: [...] }), extrai a lista.
+        // Se vier direto como array, mantém 'dados'.
+        const listaSensores = Array.isArray(dados) ? dados : (dados.sensores || dados.dados || []);
 
         const grid = document.getElementById("sensores-grid");
-          if (!grid) {
-            // Página não tem grid de sensores — não faz nada
-            return;
-        }
+        if (!grid) return;
 
-        if (sensores.length === 0) {
+        // Se após a validação a lista estiver vazia ou inválida:
+        if (!Array.isArray(listaSensores) || listaSensores.length === 0) {
             grid.innerHTML = `<p class="text-gray-500 text-lg">Nenhum sensor cadastrado ainda.</p>`;
             return;
         }
 
-        grid.innerHTML = sensores.map(s => criarCardSensor({
-            id: s.identificador,
-            nome: s.nomeSala,
-            codigo: s.identificador,
-            leituraPPM: s.ultima_leitura,
-            ultimaLeitura: s.data_hora // ainda não temos a data real
+        grid.innerHTML = listaSensores.map(s => criarCardSensor({
+            id: s.identificador || s.id,
+            nome: s.nomeSala || s.nome_local || "Sensor sem nome",
+            codigo: s.identificador || s.id,
+            leituraPPM: s.valor ?? s.ultima_leitura ?? 0,
+            ultimaLeitura: s.data_hora
         })).join("");
 
     } catch (erro) {
@@ -177,8 +180,8 @@ function criarCardSensor(sensor) {
 }
 
 async function carregarHistorico() {
-    const params = new URLSearchParams(window.location.search);
-    const sensorId = params.get("local_id") || params.get("sensor") || params.get("id");
+    const urlParams = new URLSearchParams(window.location.search);
+    const sensorId = urlParams.get('id');
 
     if (!sensorId) {
         console.error("Nenhum sensor enviado na URL. URL:", window.location.search);
