@@ -43,6 +43,7 @@ class UserController {
             }
 
         } catch (error) {
+            console.error('Erro no registro:', error);
             if (req.is('json')) {
                 return res.status(500).json({ error: 'Erro ao cadastrar usuário' });
             }
