@@ -37,23 +37,34 @@ class SensorController {
     }
 
     async registerSensorWeb(req, res) {
-        try {
-            const { chave_sensor, nome_local } = req.body;
-            if (!chave_sensor || !nome_local) {
-                return res.status(400).json({ error: 'Preencha todos os campos' });
-            }
-            if (!req.session?.usuario?.id) {
-                return res.status(401).json({ error: 'Usuário não autenticado' });
-            }
-            const usuarioId = req.session.usuario.id;
-            const existe = await sensorModel.buscarPorIdentificador(chave_sensor);
-            if (existe) return res.status(409).json({ error: 'Sensor já cadastrado' });
-            await sensorModel.criar(chave_sensor, nome_local, usuarioId);
-            return res.redirect('/sensores');
-        } catch (err) {
-            console.error('Erro ao cadastrar sensor:', err);
-            return res.status(500).json({ error: 'Erro ao cadastrar sensor' });
+    try {
+        const { chave_sensor, nome_local } = req.body;
+
+        // 1. Redireciona se não estiver autenticado
+        if (!req.session?.usuario?.id) {
+            return res.redirect('/entrar?erro=Sessão expirada. Faça login novamente.');
         }
+
+        // 2. Redireciona se os campos estiverem incompletos
+        if (!chave_sensor || !nome_local) {
+            return res.redirect('/sensores?erro=Preencha todos os campos');
+        }
+
+        const usuarioId = req.session.usuario.id;
+        const existe = await sensorModel.buscarPorIdentificador(chave_sensor);
+
+        // 3. Redireciona se o sensor já existir
+        if (existe) {
+            return res.redirect('/sensores?erro=Sensor já cadastrado');
+        }
+
+        await sensorModel.criar(chave_sensor, nome_local, usuarioId);
+        return res.redirect('/sensores');
+
+    } catch (err) {
+        console.error('Erro ao cadastrar sensor:', err);
+        return res.redirect('/sensores?erro=Erro interno ao cadastrar sensor');
+    }
     }
 
     async listar(req, res) {

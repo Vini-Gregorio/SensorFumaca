@@ -4,6 +4,14 @@ import sensorController from "../controller/sensorController.js";
 
 const router = express.Router();
 
+function autenticarWeb(req, res, next) {
+    if (req.session && req.session.usuario && req.session.usuario.id) {
+        return next(); // Continua para a controller
+    }
+    // Se não tiver sessão, redireciona para a tela de login
+    return res.redirect('/entrar?erro=Faça login para acessar esta página');
+}
+
 router.post("/register", autenticar, sensorController.registerSensorWeb);
 router.post("/api/register", autenticar, sensorController.registerSensorApi);
 // lista todos (GET /sensores)
