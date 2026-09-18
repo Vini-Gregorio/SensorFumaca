@@ -25,6 +25,7 @@ function determinarStatus(ppm) {
         };
     }
 }
+
 function toDate(v) {
     if (v instanceof Date) return v;
     if (typeof v === "number") return new Date(v);
@@ -42,14 +43,12 @@ function toDate(v) {
 }
 
 function determinarStatusComTempo(ppm, ultimaLeitura) {
-    // se não tiver timestamp válido, volta ao comportamento normal
     const ultima = toDate(ultimaLeitura);
     const cincoMinMs = 5 * 60 * 1000;
 
     if (ultima && !isNaN(ultima.getTime())) {
         const diff = Date.now() - ultima.getTime();
         if (diff > cincoMinMs) {
-            // última leitura com mais de 5 minutos: considerar ESTÁVEL
             return {
                 status: 'Estável',
                 cor: 'green',
@@ -60,26 +59,18 @@ function determinarStatusComTempo(ppm, ultimaLeitura) {
         }
     }
 
-    // se chegou aqui, última leitura é recente (<=5min) ou inválida -> usa regra normal
     return determinarStatus(ppm);
 }
-
-
-// Função para formatar o tempo desde a última leitura (ainda não testado)!!!
 
 function formatarTempoUltimaLeitura(timestamp) {
     if (timestamp === null || timestamp === undefined || timestamp === "") return "-";
 
-    // tenta criar Date de forma tolerante
-   
-
     const agora = new Date();
     const ultima = toDate(timestamp);
-    if (!ultima || isNaN(ultima.getTime())) return "-"; // timestamp inválido
+    if (!ultima || isNaN(ultima.getTime())) return "-";
 
     const diffMs = agora.getTime() - ultima.getTime();
 
-    // se timestamp no futuro (aceita 5s de tolerância)
     if (diffMs < -5000) {
         return "em breve";
     }
@@ -100,20 +91,16 @@ function formatarTempoUltimaLeitura(timestamp) {
     const semanas = Math.floor(dias / 7);
     if (semanas < 5) return `há ${semanas} ${semanas === 1 ? "semana" : "semanas"}`;
 
-    // fallback: exibe data completa em pt-BR para diferenças muito grandes
     return `em ${ultima.toLocaleDateString("pt-BR")} ${ultima.toLocaleTimeString("pt-BR")}`;
 }
 
-
-
 function criarCardSensor(sensor) {
-      // sensor.leituraPPM = valor (número ou null)
-    // sensor.ultimaLeitura = timestamp (string, number ou Date)
     const status = determinarStatusComTempo(sensor.leituraPPM, sensor.ultimaLeitura);
     const tempoFormatado = formatarTempoUltimaLeitura(sensor.ultimaLeitura);
     
+    // Aceita tanto 'id' quanto 'local_id'
     return `
-        <a href="visualizacaoSensor.html?local_id=${sensor.id}" 
+        <a href="visualizacaoSensor.html?id=${sensor.id}" 
            class="block bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 transform hover:-translate-y-1 border-t-4 ${status.borda}">
             <div class="p-6">
                 <div class="flex justify-between items-start mb-4">
@@ -131,7 +118,7 @@ function criarCardSensor(sensor) {
                         <span class="font-bold ${status.texto}">${sensor.leituraPPM} PPM</span>
                     </p>
                     <p class="${(sensor.leituraPPM ?? 0) > 100 ? 'text-red-500 font-semibold' : 'text-gray-500'} text-sm">
-                    Captado : ${tempoFormatado}
+                        Captado: ${tempoFormatado}
                     </p>
                 </div>
             </div>
@@ -139,28 +126,20 @@ function criarCardSensor(sensor) {
     `;
 }
 
-// exemplos de dados de sensores, enquanto não ha banco
-
 async function carregarSensores() {
     try {
-        const resposta = await fetch("/api/web/sensores", {
-            credentials: "include"
-        });
+        const resposta = await fetch("/api/web/sensores", { credentials: "include" });
 
         if (!resposta.ok) {
             throw new Error("Erro ao buscar sensores (status: " + resposta.status + ")");
         }
 
         const dados = await resposta.json();
-
-        // Se a API retornar um objeto encapsulado (ex: { sensores: [...] }), extrai a lista.
-        // Se vier direto como array, mantém 'dados'.
         const listaSensores = Array.isArray(dados) ? dados : (dados.sensores || dados.dados || []);
 
         const grid = document.getElementById("sensores-grid");
         if (!grid) return;
 
-        // Se após a validação a lista estiver vazia ou inválida:
         if (!Array.isArray(listaSensores) || listaSensores.length === 0) {
             grid.innerHTML = `<p class="text-gray-500 text-lg">Nenhum sensor cadastrado ainda.</p>`;
             return;
@@ -180,85 +159,85 @@ async function carregarSensores() {
 }
 
 async function carregarHistorico() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sensorId = urlParams.get('id');
-
-    if (!sensorId) {
-        console.error("Nenhum sensor enviado na URL. URL:", window.location.search);
-        return;
-    }
-
-    // seletores (confirme que estes ids existem no HTML)
     const tabelaBody = document.querySelector("#tbody") || document.querySelector("#historico-body");
     const tituloSala = document.querySelector("#titulo-sala") || document.querySelector("#titulo-sensor");
     const valorAtualDiv = document.querySelector("#valor-atual");
-    const valorDatahora = document.querySelector("#valor-datahora") || null;
+    const valorDatahora = document.querySelector("#valor-datahora");
+    const statusDot = document.querySelector("#status-dot");
+    const statusText = document.querySelector("#status-text");
 
-    if (!tabelaBody || !tituloSala || !valorAtualDiv) {
-        console.error("Elementos da página não encontrados. IDs esperados: #tbody (ou #historico-body), #titulo-sala (ou #titulo-sensor), #valor-atual");
+    // Só executa se estiver na tela visualizacaoSensor.html
+    if (!tabelaBody || !tituloSala || !valorAtualDiv) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    // Aceita 'id' ou 'local_id' na URL para evitar falhar caso venha como ?local_id= ou ?id=
+    const sensorId = urlParams.get('id') || urlParams.get('local_id');
+
+    if (!sensorId) {
+        console.error("Nenhum ID de sensor enviado na URL.");
+        tabelaBody.innerHTML = `<tr><td colspan="4" class="py-4 text-red-500 text-center">Sensor não especificado na URL.</td></tr>`;
         return;
     }
 
     try {
-        // buscar histórico
-        const resposta = await fetch(`/api/alertas?sensorId=${encodeURIComponent(sensorId)}`, { credentials: "include" });
+        // 1. Busca os dados do sensor para exibir o nome da sala no título
+        try {
+            const r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
+            if (r2.ok) {
+                const sensorInfo = await r2.json();
+                const salaNome = sensorInfo.nomeSala || sensorInfo.nome_local || sensorInfo.identificador || sensorId;
+                tituloSala.innerHTML = `Status da<br>${salaNome}`;
+            } else {
+                tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
+            }
+        } catch (errSensor) {
+            tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
+        }
+
+        // 2. Busca o histórico de alertas do sensor
+        const resposta = await fetch(`/alertas?sensorId=${encodeURIComponent(sensorId)}`, { credentials: "include" });
 
         if (!resposta.ok) {
-            console.error("Erro na resposta da API (histórico):", resposta.status, await resposta.text());
             tabelaBody.innerHTML = `<tr><td colspan="4" class="py-4 text-red-500 text-center">Erro ao buscar histórico (${resposta.status})</td></tr>`;
             return;
         }
 
         const dados = await resposta.json();
 
-        // se não tem alertas, busca nome do sensor e atualiza título, mostra mensagem amigável
         if (!Array.isArray(dados) || dados.length === 0) {
-            // tenta buscar meta do sensor
-            try {
-                const r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
-                if (r2.ok) {
-                    const sensorInfo = await r2.json();
-                    // atualizar título com nome da sala (ou identificador se nome faltar)
-                    const salaNome = sensorInfo.nomeSala || sensorInfo.identificador || sensorId;
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId} (${salaNome})`;
-                } else {
-                    // se não achou, apenas coloca identificador
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
-                }
-            } catch (errSensor) {
-                // erro ao buscar sensor -> mesmo assim atualiza com identificador
-                tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
-                console.warn("Não foi possível buscar info do sensor:", errSensor);
-            }
-
             tabelaBody.innerHTML = `<tr><td colspan="4" class="py-4 text-gray-500 text-center">Nenhum alerta registrado</td></tr>`;
             valorAtualDiv.textContent = "-";
             if (valorDatahora) valorDatahora.textContent = "-";
             return;
         }
 
-        // existem alertas -> preencher normalmenteconst r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
-               const r2 = await fetch(`/sensores/${encodeURIComponent(sensorId)}`, { credentials: "include" });
-                if (r2.ok) {
-                    const sensorInfo = await r2.json();
-                    // atualizar título com nome da sala (ou identificador se nome faltar)
-                    const salaNome = sensorInfo.nomeSala || sensorInfo.identificador || sensorId;
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId} (${salaNome})`;
-                } else {
-                    // se não achou, apenas coloca identificador
-                    tituloSala.innerHTML = `Status do<br>Sensor ${sensorId}`;
-                }
+        // 3. Atualiza o valor atual do alerta mais recente
+        const ultimoAlerta = dados[0];
+        const valorPPM = ultimoAlerta.valor ?? 0;
 
-        valorAtualDiv.textContent = dados[0].valor ?? "-";
-        if (valorDatahora) valorDatahora.textContent = dados[0].data_hora ? new Date(dados[0].data_hora).toLocaleString("pt-BR") : "-";
+        valorAtualDiv.textContent = `${valorPPM} PPM`;
+        if (valorDatahora) {
+            valorDatahora.textContent = ultimoAlerta.data_hora 
+                ? new Date(ultimoAlerta.data_hora).toLocaleString("pt-BR") 
+                : "-";
+        }
 
+        // 4. Atualiza a bolinha de status e o texto (Estável/Atenção/Alerta)
+        if (statusDot && statusText) {
+            const statusObj = determinarStatusComTempo(valorPPM, ultimoAlerta.data_hora);
+            statusText.textContent = statusObj.status;
+            statusDot.className = `w-6 h-6 rounded-full ${statusObj.bg}`;
+            valorAtualDiv.className = `text-7xl font-bold ${statusObj.texto}`;
+        }
+
+        // 5. Preenche a tabela com o histórico
         tabelaBody.innerHTML = dados.map(alerta => `
             <tr class="text-gray-700 text-sm md:text-base">
                 <td class="py-2 pr-4">${alerta.id ?? "-"}</td>
-                <td class="py-2 px-4 ${alerta.nivel === 'vermelho' ? 'text-red-500' : alerta.nivel === 'amarelo' ? 'text-yellow-500' : 'text-green-500'} font-medium">
+                <td class="py-2 px-4 ${alerta.nivel === 'vermelho' ? 'text-red-500 font-bold' : alerta.nivel === 'amarelo' ? 'text-yellow-500 font-bold' : 'text-green-500 font-bold'}">
                     ${alerta.nivel ?? "—"}
                 </td>
-                <td class="py-2 pr-4">${alerta.valor ?? "-"}</td>
+                <td class="py-2 pr-4">${alerta.valor ?? "-"} PPM</td>
                 <td class="py-2 pl-4">${alerta.data_hora ? new Date(alerta.data_hora).toLocaleString("pt-BR") : "-"}</td>
             </tr>
         `).join("");
@@ -269,14 +248,14 @@ async function carregarHistorico() {
     }
 }
 
-
-
-// Chama a função quando o script for carregado
-carregarHistorico();
-
+// Inicializa automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById("sensores-grid")) {
-    carregarSensores();
-    setInterval(carregarSensores, 30001);
-  }
+    if (document.getElementById("sensores-grid")) {
+        carregarSensores();
+        setInterval(carregarSensores, 30000);
+    }
+    
+    if (document.querySelector("#tbody")) {
+        carregarHistorico();
+    }
 });

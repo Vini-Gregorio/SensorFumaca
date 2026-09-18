@@ -132,20 +132,21 @@ export async function listarPorUsuario(usuarioId) {
 // -----------------------------
 // LISTAR ALERTAS POR SENSOR
 // -----------------------------
-export async function listarPorSensor(sensorId) {
+export async function listarPorSensor(usuarioId, sensorId) {
   const query = `
     SELECT 
-        id,
-        sensor,
-        valor,
-        nivel,
-        data_hora
-    FROM alertas
-    WHERE sensor = ?
-    ORDER BY data_hora DESC;
+        a.id,
+        a.sensor,
+        a.valor,
+        a.nivel,
+        a.data_hora
+    FROM alertas a
+    INNER JOIN sensores s ON s.identificador = a.sensor
+    WHERE s.usuario_id = ? AND (s.identificador = ? OR s.id = ?)
+    ORDER BY a.data_hora DESC;
   `;
 
-  const [rows] = await pool.execute(query, [sensorId]);
+  const [rows] = await pool.execute(query, [usuarioId, sensorId, sensorId]);
   return rows;
 }
 

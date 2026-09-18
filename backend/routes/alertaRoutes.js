@@ -8,10 +8,18 @@ router.post("/", autenticar, criarAlerta);
 router.get("/", autenticar, async (req, res) => {
   try {
     const usuarioId = req.session.usuario.id;
+    const { sensorId, sensor_id } = req.query;
+    const idFiltrar = sensorId || sensor_id;
+
+    if (idFiltrar) {
+      const alertas = await alertaModel.listarPorSensor(usuarioId, idFiltrar);
+      return res.json(alertas);
+    }
+
     const alertas = await alertaModel.listarPorUsuario(usuarioId);
     res.json(alertas);
   } catch (err) {
-    console.error(err);
+    console.error("Erro em GET /alertas:", err);
     res.status(500).json({ erro: "Erro ao buscar alertas" });
   }
 });
