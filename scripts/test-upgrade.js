@@ -47,8 +47,14 @@ try {
     ["upgrade-device"],
   );
   assert.equal(count.n, 1);
+  const [tablesAfter] = await c.query("SHOW TABLES LIKE 'experiment%'");
+  assert.equal(
+    tablesAfter.length,
+    3,
+    "Tabelas experimentais adicionadas sem remover dados V2",
+  );
   console.log(
-    "Upgrade 001 → 002 preserva limites existentes e não inventa versões passadas; migração repetida OK.",
+    "Upgrade 001 → 002 → 003 preserva limites existentes, adiciona ensaios e não inventa versões passadas; migração repetida OK.",
   );
 } finally {
   await c.end();

@@ -4,6 +4,8 @@ O objetivo é ligar requisito → implementação → teste → evidência → a
 
 As sugestões de evolução, critérios de aceite e recorte da IA estão em [EVOLUTION.md](EVOLUTION.md). O painel já permite exportar evidências com configurações versionadas; o pesquisador ainda precisa registrar protocolo, montagem e rótulos independentes.
 
+O [caderno de ensaios](EXPERIMENTS.md) agora registra esse protocolo antes do início, vincula até oito dispositivos e reúne observações e conclusão explícita. Use um ensaio identificado em cada linha de resultado do TG. A existência do caderno não torna automaticamente realizado nenhum dos marcos físicos abaixo.
+
 ## Marcos e critérios de aceite
 
 | Prioridade / marco | Entrega | Evidência exigida | Estado inicial desta refatoração |

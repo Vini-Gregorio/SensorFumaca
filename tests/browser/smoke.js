@@ -86,7 +86,60 @@ const config = {
   allowRegistration: true,
   telegramEnabled: false,
 };
-const server = createApp({ repo, config }).listen(0, "127.0.0.1");
+let experimentRecord;
+const experiments = {
+  list: async () => (experimentRecord ? [experimentRecord.experiment] : []),
+  create: async (userId, input) => {
+    experimentRecord = {
+      experiment: {
+        id: 1,
+        title: input.title,
+        objective: input.objective,
+        protocol: input.protocol,
+        acceptance_criteria: input.acceptanceCriteria,
+        environment: input.environment,
+        hardware: input.hardware,
+        software_ref: input.softwareRef,
+        status: "planned",
+      },
+      devices: [
+        { device_id: input.deviceIds[0], configuration_at_start: null },
+      ],
+      notes: [],
+    };
+    return 1;
+  },
+  read: async () => experimentRecord,
+  start: async () => {
+    experimentRecord.experiment.status = "running";
+    experimentRecord.experiment.started_at = new Date(
+      Date.now() - 10000,
+    ).toISOString();
+    experimentRecord.devices[0].configuration_at_start = { version: 3 };
+  },
+  note: async (userId, id, input) => {
+    experimentRecord.notes.push({
+      id: 1,
+      kind: input.kind,
+      note: input.note,
+      observed_at: new Date().toISOString(),
+      recorded_at: new Date().toISOString(),
+    });
+    return 1;
+  },
+  finish: async (userId, id, input) => {
+    Object.assign(experimentRecord.experiment, {
+      ...input,
+      status: "completed",
+      ended_at: new Date().toISOString(),
+    });
+  },
+  evidence: async () => ({
+    payload: { ...experimentRecord, rowCount: 1 },
+    sha256: "fixture",
+  }),
+};
+const server = createApp({ repo, config, experiments }).listen(0, "127.0.0.1");
 await once(server, "listening");
 config.origin = `http://127.0.0.1:${server.address().port}`;
 let browser;
@@ -159,6 +212,68 @@ try {
     .locator("#detail-data")
     .filter({ hasText: "configuration_restored" })
     .waitFor();
+  await page.getByText("Planejar novo ensaio", { exact: true }).click();
+  for (const [field, value] of Object.entries({
+    title: "Ensaio " + hostile,
+    deviceIds: "browser-lab",
+    softwareRef: "a".repeat(40),
+    objective: "Avaliar reconexão",
+    protocol: "Procedimento controlado",
+    acceptanceCriteria: "Sem duplicação SQL",
+    environment: "Bancada local",
+    hardware: "Fixture, sem placa real",
+  }))
+    await page.locator(`#experiment-create [name=${field}]`).fill(value);
+  await page
+    .getByRole("button", { name: "Salvar plano do ensaio", exact: true })
+    .click();
+  await page
+    .locator("#experiment-status")
+    .filter({ hasText: "Planejado" })
+    .waitFor();
+  assert.equal(await page.locator("#experiment-detail img").count(), 0);
+  await page
+    .getByRole("button", { name: "Iniciar ensaio", exact: true })
+    .click();
+  await page
+    .locator("#experiment-status")
+    .filter({ hasText: "Em andamento" })
+    .waitFor();
+  await page
+    .locator("#experiment-note select[name=kind]")
+    .selectOption("network");
+  await page
+    .locator("#experiment-note textarea[name=note]")
+    .fill("Rede indisponível observada pelo operador");
+  await page
+    .getByRole("button", { name: "Registrar observação", exact: true })
+    .click();
+  await page
+    .locator("#experiment-notes")
+    .filter({ hasText: "Rede indisponível" })
+    .waitFor();
+  await page
+    .locator("#experiment-finish select[name=outcome]")
+    .selectOption("inconclusive");
+  await page
+    .locator("#experiment-finish textarea[name=conclusion]")
+    .fill("Fixture de navegador não comprova ensaio físico.");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Concluir ensaio", exact: true })
+    .click();
+  await page
+    .locator("#experiment-status")
+    .filter({ hasText: "Concluído · Inconclusivo" })
+    .waitFor();
+  const experimentDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Baixar pacote do ensaio", exact: true })
+    .click();
+  assert.equal(
+    (await experimentDownload).suggestedFilename(),
+    "mqfire-experiment-1.json",
+  );
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -180,9 +295,16 @@ try {
   await page.getByRole("button", { name: "Sair", exact: true }).click();
   await page.locator("#auth").waitFor({ state: "visible" });
   assert.equal(await page.locator("#api-key").textContent(), "");
+  assert.equal(await page.locator("#experiment-description").textContent(), "");
+  assert.equal(
+    await page
+      .locator("#experiment-create textarea[name=protocol]")
+      .inputValue(),
+    "",
+  );
   assert.deepEqual(errors, []);
   console.log(
-    "Navegador: autenticação, XSS, limites, restauração, gráfico, download, auditoria, perda da API, mobile/desktop e logout OK.",
+    "Navegador: autenticação, XSS, limites, restauração, gráfico, download, auditoria, planejamento/início/anotação/conclusão/exportação de ensaio, perda da API, mobile/desktop e logout OK.",
   );
 } finally {
   if (browser) await browser.close();

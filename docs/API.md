@@ -20,6 +20,13 @@ Base `/api/v1`. JSON UTF-8, corpo até 16 KB, erros `{ "error": "mensagem" }`. H
 | GET `/devices/:id/sensors/:channel/readings` | `?before=<id>` opcional | Até 100 registros, ID decrescente; use menor ID como próximo cursor |
 | GET `/devices/:id/evidence` | `?from=<UTC ISO>&to=<UTC ISO>` | JSON privado de evidências; no máximo 24 h/10.000 leituras |
 | GET `/audit` | — | Últimas 100 alterações do proprietário, sem valores de segredos |
+| GET `/experiments` | — | Até 50 ensaios mais recentes do proprietário |
+| POST `/experiments` | Plano descrito abaixo | 201 `{id}`; estado `planned` |
+| GET `/experiments/:id` | — | Plano, dispositivos e anotações |
+| POST `/experiments/:id/start` | `{}` | 204; captura limites desejados e início |
+| POST `/experiments/:id/notes` | `kind`, `note`, `observedAt` opcional | 201 `{id}`; anotação preservada |
+| POST `/experiments/:id/finish` | `outcome`, `conclusion` | 204; encerramento explícito |
+| GET `/experiments/:id/evidence` | `from`/`to` opcionais em UTC | Pacote privado; limites globais de 24 h/10.000 leituras |
 | GET `/notifications` | — | Últimos 100 estados de entrega do proprietário |
 | POST `/notifications/:id/retry` | `{}` | 202; reenvio manual de `failed`/`disabled`, até três por entrega |
 | GET `/device/config` | Headers de dispositivo | Versão e todos os canais/limites |
@@ -78,3 +85,13 @@ O pacote reúne configurações correspondentes às versões das leituras e indi
 Reenvio: exige bot habilitado, destino atual configurado, estado `failed`/`disabled` e menos de três reenvios. Cada rodada reinicia o contador de tentativas automáticas e registra a ação em auditoria. O texto é marcado como evento histórico. Limite de dez solicitações/minuto por conta. Um `202` não comprova entrega: consultar `/notifications` para estado, tentativas, reenvios e `error_code`.
 
 `expectedVersion` é a versão desejada vista pelo editor, não a aplicada pela placa. Edição/restauração valida a versão e grava configuração, revisão e auditoria na mesma transação. Em `409`, recarregar e revisar valores: não repetir sobrescrevendo automaticamente. A restauração mantém a numeração crescente e não remove canais.
+
+## Ensaios
+
+Plano obrigatório: `title` (até 120 caracteres), `objective`, `protocol`, `acceptanceCriteria` (até 2.000 cada), `environment`, `hardware` (até 1.000 cada), `softwareRef` (SHA completo com 40 hexadecimais minúsculos) e `deviceIds` (1–8 IDs próprios distintos). O limite total do corpo de 16 KB também se aplica. Campos de texto são tratados como texto, não HTML.
+
+Estados: `planned` → `running` → `completed`. Início/encerramento duplicados retornam 409; não reiniciam o relógio nem sobrescrevem conclusão. Não há endpoint de editar/apagar protocolo. Anotações são append-only: `kind` é `observation`, `reference`, `network` ou `hardware`; `note` é texto até 1.000 caracteres; `observedAt` é UTC ISO estrito. Sem hora, usa o relógio do banco em ensaio em andamento. Depois de concluído, exige hora explícita dentro do período. Limite de 200 anotações por ensaio.
+
+`outcome` exige `met`, `not_met` ou `inconclusive`; `conclusion` é texto obrigatório até 2.000 caracteres. Todo resultado é declarado pelo pesquisador. Não há inferência de sucesso pelo estado do sensor. Mutações de ensaio compartilham limite de 30/minuto por conta.
+
+Exportação: `mqfire-experiment/1`, `{payload,sha256,hashEncoding}`. Com `from`/`to`, ambos obrigatórios e dentro do período do ensaio. Sem eles, tenta o intervalo completo; períodos acima de 24 h exigem exportação parcial. O máximo de 10.000 leituras é a soma dos dispositivos. Plano, anotações e leituras são consultados na mesma transação. Textos livres podem conter dados privados; revisar antes de compartilhar. Cinco exportações/minuto por conta.

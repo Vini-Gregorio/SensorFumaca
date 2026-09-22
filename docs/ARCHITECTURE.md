@@ -53,6 +53,12 @@ Entrada: janelas de leituras com tipo/unidade, versão de hardware/firmware, con
 
 Etapas: criar dataset autorizado e pseudonimizado; estabelecer baseline por regras; separar treino/teste por sessão/dispositivo (evitar vazamento temporal); comparar detecção de anomalias simples; medir falsos positivos/negativos, latência e custo; documentar model card e reprodutibilidade. Só integrar inferência online depois de ganho medido sobre baseline. Modelos e dados comerciais ficam no repositório privado, sem segredos no público.
 
+## Caderno experimental
+
+`experiments` mantém método, condições, commit declarado, estado e conclusão; `experiment_devices` vincula dispositivos próprios e captura limites desejados no início; `experiment_notes` separa observação manual de estado do firmware, com horários de ocorrência e registro. O módulo `backend/experiments.js` coordena transações sem criar outro serviço ou depender de IA.
+
+Plano e conclusão não têm rotas de sobrescrita. Mudanças de estado e inserção de anotações usam lock de ensaio para impedir início/encerramento concorrente ou ultrapassar o limite de notas. Locks de dispositivos são adquiridos em ordem ao iniciar. A exportação reúne todos os dispositivos na mesma transação, mantendo limites globais e explicitando dados tardios. O firmware mantém seu contrato e não depende desse módulo para alarmar.
+
 ## Escalabilidade planejada
 
 Adicionar tipos de sensor requer schema de unidade/faixa, adaptador de leitura, validação, visualização e testes; não basta aceitar números arbitrários. Para operação maior: retenção/particionamento medidos, pool dimensionado, rate limiter compartilhado, observabilidade, backup/restore e teste de worker concorrente. MQTT, OTA assinada, secure boot e flash encryption são decisões futuras, não promessas de suporte atual.

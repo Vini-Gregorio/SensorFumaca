@@ -1,4 +1,6 @@
+import { mountExperiments } from "./experiments.js";
 const $ = (id) => document.getElementById(id);
+const experimentsUI = mountExperiments({ api, run, message });
 let signedIn = false,
   refreshing = false;
 let visibleReadings = [],
@@ -27,6 +29,7 @@ function showAuth() {
   $("workspace").hidden = !signedIn;
   $("logout").hidden = !signedIn;
   if (!signedIn) {
+    experimentsUI.reset();
     $("sensors").replaceChildren();
     $("api-key").textContent = "";
     $("credential").hidden = true;

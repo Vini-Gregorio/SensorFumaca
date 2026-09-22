@@ -60,6 +60,7 @@ p {
   gap: 16px;
 }
 .card,
+.experiment-card,
 details,
 #auth,
 #credential {
@@ -100,13 +101,17 @@ label {
   min-width: 170px;
 }
 input,
+select,
+textarea,
 button {
   font: inherit;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
 }
-input {
+input,
+select,
+textarea {
   background: var(--bg);
   color: var(--text);
   min-width: 0;
@@ -120,6 +125,8 @@ button {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 summary:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 3px;
@@ -131,6 +138,21 @@ button:disabled {
 summary {
   cursor: pointer;
   font-weight: 650;
+}
+textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+#experiment-detail {
+  border-left: 3px solid var(--accent);
+  padding-left: 18px;
+}
+#experiment-description,
+#experiment-notes {
+  overflow-wrap: anywhere;
+}
+#experiment-create label:has(textarea) {
+  flex-basis: 45%;
 }
 .section-title {
   display: flex;

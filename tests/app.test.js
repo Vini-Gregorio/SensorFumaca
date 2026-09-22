@@ -6,7 +6,7 @@ import { createApp } from "../backend/app.js";
 import { token, hash, HttpError } from "../backend/domain.js";
 
 // Dublê só para fronteira HTTP. Persistência real é exercitada separadamente em integration/.
-async function fixture(t, overrides = {}) {
+async function fixture(t, overrides = {}, experiments) {
   const key = token(),
     sessions = new Map();
   const password = token();
@@ -37,7 +37,10 @@ async function fixture(t, overrides = {}) {
     allowRegistration: true,
     telegramEnabled: false,
   };
-  const server = createApp({ repo, config }).listen(0, "127.0.0.1");
+  const server = createApp({ repo, config, experiments }).listen(
+    0,
+    "127.0.0.1",
+  );
   await once(server, "listening");
   t.after(
     () =>
@@ -112,6 +115,9 @@ test("protege recursos e remove debug/rotas legadas", async (t) => {
     "/api/v1/audit",
     "/api/v1/devices/lab/config/revisions",
     "/api/v1/devices/lab/evidence",
+    "/api/v1/experiments",
+    "/api/v1/experiments/1",
+    "/api/v1/experiments/1/evidence",
   ])
     assert.equal((await f.request(path)).status, 401);
   for (const path of ["/debug", "/api/esp32", "/.env", "/backend/.env"])
@@ -323,4 +329,105 @@ test("reenvio manual exige origem e canal habilitado", async (t) => {
     409,
   );
   assert.equal(called, false);
+});
+
+test("ensaios protegem escrita, validam plano/conclusão e retornam exportação privada", async (t) => {
+  let created = 0,
+    finished = 0;
+  const f = await fixture(
+    t,
+    {},
+    {
+      create: async (user, input) => {
+        assert.equal(user, 1);
+        assert.deepEqual(input.deviceIds, ["lab"]);
+        created++;
+        return 1;
+      },
+      finish: async () => {
+        finished++;
+      },
+      evidence: async () => ({ payload: { rowCount: 0 } }),
+    },
+  );
+  const Cookie = await f.login(),
+    headers = { Cookie, Origin: f.config.origin };
+  const plan = {
+    title: "Bancada",
+    objective: "Objetivo",
+    protocol: "Método",
+    acceptanceCriteria: "Critério prévio",
+    environment: "Laboratório",
+    hardware: "Placa",
+    softwareRef: "a".repeat(40),
+    deviceIds: ["lab"],
+  };
+  assert.equal(
+    (await f.request("/api/v1/experiments", "POST", plan, { Cookie })).status,
+    403,
+  );
+  assert.equal(
+    (await f.request("/api/v1/experiments", "POST", {}, headers)).status,
+    400,
+  );
+  assert.equal(created, 0);
+  assert.equal(
+    (await f.request("/api/v1/experiments", "POST", plan, headers)).status,
+    201,
+  );
+  assert.equal(created, 1);
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/experiments/1/finish",
+        "POST",
+        { conclusion: "Sem resultado" },
+        headers,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(finished, 0);
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/experiments/1/finish",
+        "POST",
+        { outcome: "inconclusive", conclusion: "Dados insuficientes" },
+        headers,
+      )
+    ).status,
+    204,
+  );
+  const result = await f.request(
+    "/api/v1/experiments/1/evidence",
+    "GET",
+    undefined,
+    { Cookie },
+  );
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get("cache-control"), "no-store");
+  assert.match(
+    result.headers.get("content-disposition"),
+    /mqfire-experiment-1/,
+  );
+  assert.equal(
+    (
+      await f.request("/api/v1/experiments/0/evidence", "GET", undefined, {
+        Cookie,
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/experiments/1/evidence?from=invalid",
+        "GET",
+        undefined,
+        { Cookie },
+      )
+    ).status,
+    400,
+  );
 });

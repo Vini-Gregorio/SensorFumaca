@@ -3,6 +3,8 @@
 ESP32 + MQ-2, API Node.js/Express, MariaDB, dashboard responsivo e alertas Telegram.
 Este repositório é a versão **acadêmica, didática e replicável** do projeto da FATEC Cruzeiro, originado na curricularização em parceria com a AAP (Associação Amando o Próximo). A frente comercial fica fora deste repositório, em projeto privado independente.
 
+**Condução atual: Vinícius Gregório.** Créditos anteriores e escopo da manutenção estão em [AUTHORS.md](AUTHORS.md). A separação do vínculo de fork está preparada em [independência do repositório](docs/REPOSITORY-INDEPENDENCE.md); ainda não foi executada.
+
 > V2 em validação. Esta refatoração altera API e esquema de dados. Use um **banco novo** e atualize o firmware junto com o backend. Não substitua uma instalação existente sem backup, revisão e ensaio. O histórico Git antigo ainda pode conter credenciais: leia [SECURITY.md](SECURITY.md).
 
 ## O que esta versão faz
@@ -15,6 +17,7 @@ Este repositório é a versão **acadêmica, didática e replicável** do projet
 - Histórico das configurações, restauração como nova versão e proteção contra edições concorrentes.
 - Dashboard web/mobile responsivo com leituras, tendência ADC, diagnóstico da placa e aviso de perda de atualização. Não é um aplicativo Android nativo.
 - Exportação privada de evidências com leituras, configurações, diagnóstico e hash de integridade; histórico de alterações por proprietário.
+- Caderno de ensaios: protocolo e critério de aceite prévios, até oito dispositivos, observações independentes e conclusão explícita, com exportação conjunta.
 - Telegram com outbox transacional, timeout, tentativas limitadas, respeito a `retry_after` e reenvio manual identificado. Desligado por padrão.
 - Testes de API/domínio, integração MariaDB e núcleo C++ do alarme, mais compilação do firmware na CI.
 
@@ -134,13 +137,15 @@ npm audit --omit=dev
 pio run
 ```
 
-A integração requer banco **descartável separado**, cujo nome termine em `_test`. Defina as variáveis de conexão para esse banco, execute `npm run db:migrate` e `RUN_DB_TESTS=1 npm run test:integration` (PowerShell: `$env:RUN_DB_TESTS='1'`). Sem a flag, o teste é **pulado**, não validado. A CI cria MariaDB próprio e verifica atualização 001 → 002 com dados existentes, repetição das migrações e integração. Para reproduzir o ensaio de atualização, use `RUN_DB_TESTS=1 npm run test:upgrade` antes das outras etapas, em banco de teste **vazio**: ele recusa banco já populado e não apaga tabelas. Não aponte testes para o banco de campo.
+A integração requer banco **descartável separado**, cujo nome termine em `_test`. Defina as variáveis de conexão para esse banco, execute `npm run db:migrate` e `RUN_DB_TESTS=1 npm run test:integration` (PowerShell: `$env:RUN_DB_TESTS='1'`). Sem a flag, o teste é **pulado**, não validado. A CI cria MariaDB próprio e verifica atualização 001 → 002 → 003 com dados existentes, repetição das migrações e integração. Para reproduzir o ensaio de atualização, use `RUN_DB_TESTS=1 npm run test:upgrade` antes das outras etapas, em banco de teste **vazio**: ele recusa banco já populado e não apaga tabelas. Não aponte testes para o banco de campo.
 
 O smoke de navegador usa Chromium e dublê do banco: não substitui a integração SQL. O inventário e a evidência da refatoração estão em [VALIDATION.md](docs/VALIDATION.md). Testes de carga, segurança operacional e campo têm critérios e pendências no [plano do TG](docs/TG-ROADMAP.md). Aprovar CI não comprova precisão, conformidade ou confiabilidade do protótipo físico.
 
 Roteiro de carga inicial: `tests/load/telemetry.k6.js` (k6 instalado separadamente), somente localhost e com `ALLOW_LOAD_TESTS=1`, `DEVICE_ID` e `DEVICE_API_KEY` no ambiente. Comando: `k6 run tests/load/telemetry.k6.js`. Usa 2 VUs/30 s; metas experimentais iniciais p95 <500 ms e erro <1%, a confirmar antes do ensaio. Não desative o rate limit para mascarar saturação; mais de 120 requisições/minuto por dispositivo deve gerar 429. Ensaios com muitos dispositivos exigem identidades distintas e roteiro ampliado. Nenhum resultado de carga é presumido.
 
 ## 6. Conduzir um ensaio rastreável
+
+Use **Caderno de ensaios do TG → Planejar novo ensaio** para registrar método, condições, montagem, dispositivos e commit completo (`git rev-parse HEAD`). Inicie o ensaio quando estiver pronto; o servidor captura a configuração desejada naquele momento. Durante o ensaio, registre observações independentes e eventos de rede/hardware. Ao concluir, selecione critério atendido, não atendido ou inconclusivo e justifique; o resultado não é inferido do sensor. Consulte o [roteiro detalhado](docs/EXPERIMENTS.md).
 
 1. Registre objetivo, critério de aceite, montagem, condições, commit e procedimento aprovado no [modelo do TG](docs/TG-ROADMAP.md). Configure os limites antes do ensaio; guarde a justificativa.
 2. Confira no painel **versão aplicada = desejada**. Salvar uma edição não comprova que o ESP32 já a recebeu. Conflito `409` ao editar significa que outra alteração ocorreu: feche o formulário, atualize e confira os valores antes de tentar novamente.
@@ -153,7 +158,7 @@ O gráfico exibe até 100 registros, com espaçamento por ordem de registro, nã
 
 ## 7. Implantação e atualização
 
-- Faça backup e ensaie restauração; use banco V2 novo ao sair do legado. Se já usa a V2 com migração 001, pare API/worker e aplique a migração aditiva 002 antes de iniciar esta versão. [Migração](docs/MIGRATION.md).
+- Faça backup e ensaie restauração; use banco V2 novo ao sair do legado. Se já usa a V2, pare API/worker e aplique as migrações pendentes 002/003 antes de iniciar esta versão. [Migração](docs/MIGRATION.md).
 - Disponibilize HTTPS por proxy reverso. `NODE_ENV=production`, `APP_ORIGIN=https://seu-host`, `ALLOW_REGISTRATION=false` após provisionar contas. Sem tela administrativa de convite nesta versão.
 - `TRUST_PROXY=1` apenas atrás de **um proxy confiável**, com acesso direto à API bloqueado. No acesso direto, use `0`.
 - Configure TLS do banco com `DB_TLS_CA_FILE` para conexões fora de rede privada. Use usuário restrito; não use root na aplicação.
@@ -178,4 +183,4 @@ docs/                contrato, decisões, migração, evidências e plano do TG
 
 Protótipo acadêmico de monitoramento e estudo: não substitui equipamento certificado nem determina gás/concentração somente pela resposta do MQ-2. O valor acadêmico está na integração, nos ensaios rastreáveis, na discussão das limitações e na possibilidade de reprodução.
 
-Projeto original: **Amanda do Prado** (frontend, backend e documentação) e **Vinícius Gregório** (backend). Esta base preserva o histórico de colaboração e usa os avanços da branch `testes-git` como ponto de partida; telas e APIs foram substituídas, sem manter rotas antigas inseguras. Evolução do TG conduzida por Vinícius Gregório. Não se presume concessão de nova licença nem transferência de autoria: definir a licença com os autores é uma decisão pendente. Código público não significa autorização comercial irrestrita.
+Projeto original com contribuições de **Amanda do Prado** e **Vinícius Gregório**, detalhadas em [AUTHORS.md](AUTHORS.md). A evolução acadêmica atual é conduzida por Vinícius; o crédito anterior não implica participação ou manutenção atual. Esta base usa os avanços de `testes-git` como ponto de partida; telas e APIs foram substituídas. A definição de licença continua pendente.

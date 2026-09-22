@@ -84,6 +84,153 @@
           </p>
         </details>
         <button id="audit">Ver histórico de alterações</button>
+        <section aria-labelledby="experiments-heading">
+          <h2 id="experiments-heading">Caderno de ensaios do TG</h2>
+          <p>
+            Registre o método antes de testar. Anotações e conclusão são
+            avaliações do pesquisador; o sistema não calcula precisão nem
+            certifica o protótipo.
+          </p>
+          <button id="experiments-refresh">Listar ensaios (50 recentes)</button>
+          <div id="experiment-list" class="grid"></div>
+          <details>
+            <summary>Planejar novo ensaio</summary>
+            <form id="experiment-create">
+              <label
+                >Título<input name="title" maxlength="120" required
+              /></label>
+              <label
+                >IDs dos dispositivos, separados por vírgula<input
+                  name="deviceIds"
+                  required
+                  placeholder="esp32-lab01, esp32-lab02"
+              /></label>
+              <label
+                >Commit do software (SHA completo)<input
+                  name="softwareRef"
+                  pattern="[a-f0-9]{40}"
+                  required
+                  maxlength="40"
+              /></label>
+              <label
+                >Objetivo<textarea
+                  name="objective"
+                  required
+                  maxlength="2000"
+                ></textarea>
+              </label>
+              <label
+                >Procedimento aprovado<textarea
+                  name="protocol"
+                  required
+                  maxlength="2000"
+                ></textarea>
+              </label>
+              <label
+                >Critério de aceite definido antes do ensaio<textarea
+                  name="acceptanceCriteria"
+                  required
+                  maxlength="2000"
+                ></textarea>
+              </label>
+              <label
+                >Condições do ambiente<textarea
+                  name="environment"
+                  required
+                  maxlength="1000"
+                ></textarea>
+              </label>
+              <label
+                >Montagem, alimentação e versão do firmware<textarea
+                  name="hardware"
+                  required
+                  maxlength="1000"
+                ></textarea>
+              </label>
+              <p>
+                Use códigos para locais e pessoas. Não registre senhas, chaves
+                ou dados pessoais. O plano fica preservado após o cadastro; se
+                precisar corrigir o método, crie outro ensaio.
+              </p>
+              <button>Salvar plano do ensaio</button>
+            </form>
+          </details>
+          <section id="experiment-detail" hidden>
+            <h3 id="experiment-title"></h3>
+            <p id="experiment-status" role="status"></p>
+            <div id="experiment-description"></div>
+            <button id="experiment-start" hidden>Iniciar ensaio</button>
+            <h4>Observações independentes</h4>
+            <ol id="experiment-notes"></ol>
+            <form id="experiment-note" hidden>
+              <label
+                >Tipo<select name="kind">
+                  <option value="observation">Observação</option>
+                  <option value="reference">Referência independente</option>
+                  <option value="network">Rede</option>
+                  <option value="hardware">Hardware</option>
+                </select></label
+              >
+              <label
+                >Quando ocorreu (hora local; vazio = agora)<input
+                  name="observedAt"
+                  type="datetime-local"
+                  step="0.001"
+              /></label>
+              <label
+                >Observação e como foi obtida<textarea
+                  name="note"
+                  maxlength="1000"
+                  required
+                ></textarea>
+              </label>
+              <p>
+                Até 200 anotações, preservadas sem sobrescrita. Para corrigir
+                uma anotação, acrescente outra explicando a correção. Após
+                concluir, informe a hora real da observação.
+              </p>
+              <button>Registrar observação</button>
+            </form>
+            <form id="experiment-finish" hidden>
+              <label
+                >Resultado avaliado<select name="outcome" required>
+                  <option value="">Selecione após analisar</option>
+                  <option value="met">Critério atendido</option>
+                  <option value="not_met">Critério não atendido</option>
+                  <option value="inconclusive">Inconclusivo</option>
+                </select></label
+              >
+              <label
+                >Conclusão, falhas e limitações<textarea
+                  name="conclusion"
+                  maxlength="2000"
+                  required
+                ></textarea>
+              </label>
+              <button>Concluir ensaio</button>
+            </form>
+            <form id="experiment-export" hidden>
+              <label
+                >Início parcial (opcional, hora local)<input
+                  name="from"
+                  type="datetime-local"
+                  step="0.001"
+              /></label>
+              <label
+                >Fim parcial (opcional, hora local)<input
+                  name="to"
+                  type="datetime-local"
+                  step="0.001"
+              /></label>
+              <p>
+                Sem datas, exporta o período do ensaio. Até 24 h e 10.000
+                leituras somando todos os dispositivos; divida em intervalos se
+                exceder. Os textos livres também estarão no arquivo privado.
+              </p>
+              <button>Baixar pacote do ensaio</button>
+            </form>
+          </section>
+        </section>
         <details>
           <summary>Cadastrar dispositivo</summary>
           <form id="device">

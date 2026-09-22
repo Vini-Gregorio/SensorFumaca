@@ -135,24 +135,25 @@ export function dashboardStatus(row, now = Date.now()) {
   );
 }
 
+export function utcDate(value) {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)
+  )
+    throw new HttpError(400, "Informe from/to em UTC ISO 8601.");
+  const date = new Date(value);
+  if (
+    !Number.isFinite(date.getTime()) ||
+    date.toISOString() !==
+      (value.length === 20 ? `${value.slice(0, -1)}.000Z` : value)
+  )
+    throw new HttpError(400, "Data inválida.");
+  return date;
+}
+
 export function evidenceWindow(query) {
-  const parse = (value) => {
-    if (
-      typeof value !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)
-    )
-      throw new HttpError(400, "Informe from/to em UTC ISO 8601.");
-    const date = new Date(value);
-    if (
-      !Number.isFinite(date.getTime()) ||
-      date.toISOString() !==
-        (value.length === 20 ? `${value.slice(0, -1)}.000Z` : value)
-    )
-      throw new HttpError(400, "Data inválida.");
-    return date;
-  };
-  const from = parse(query.from),
-    to = parse(query.to);
+  const from = utcDate(query.from),
+    to = utcDate(query.to);
   if (to <= from || to - from > 86400000)
     throw new HttpError(
       400,

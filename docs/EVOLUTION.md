@@ -2,6 +2,8 @@
 
 O próximo salto do MQ-FIRE deve ser tornar cada resultado reproduzível: qual placa, qual montagem, qual versão, quais limites e quais condições produziram aquela leitura. IA e mais sensores fazem sentido quando essa base existe. A aplicação pública continua suficiente para reproduzir o TG; comercialização, clientes e dados privados pertencem a outro projeto.
 
+O [caderno de ensaios](EXPERIMENTS.md) implementa o registro de método prévio, dispositivos, montagem, observações independentes e conclusão explícita. Ele organiza os dados para as prioridades abaixo; não substitui sua execução em hardware. A [independência do repositório](REPOSITORY-INDEPENDENCE.md) está preparada, sem exclusão do fork existente.
+
 ## O que foi acrescentado nesta evolução
 
 | Problema | Implementação | Limite que ainda precisa de ensaio |

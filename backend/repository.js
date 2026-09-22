@@ -353,8 +353,8 @@ export class Repository {
       });
     });
   }
-  async evidence(userId, id, window) {
-    return this.transaction(async (c) => {
+  async evidence(userId, id, window, connection) {
+    const collect = async (c) => {
       await this.ownedDevice(id, userId, c);
       const rows = await this.rows(
         `SELECT r.id,r.event_id,s.channel,r.value,r.state,r.observed_at,e.received_at,e.boot_id,e.sequence,e.uptime_ms,e.config_version,e.manual_alarm,e.dropped_samples,e.diagnostics
@@ -382,7 +382,8 @@ export class Repository {
         rows.map((r) => ({ ...r, diagnostics: json(r.diagnostics) })),
         revisions.map((r) => ({ ...r, snapshot: json(r.snapshot) })),
       );
-    });
+    };
+    return connection ? collect(connection) : this.transaction(collect);
   }
   async ingest(body, ageMs, authenticatedHash, notificationsEnabled) {
     return this.transaction(async (c) => {

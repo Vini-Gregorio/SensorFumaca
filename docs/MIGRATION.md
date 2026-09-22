@@ -39,6 +39,12 @@ MariaDB/MySQL fazem commits implícitos em DDL. O migrador registra checksum e n
 
 Não há migração reversa automatizada. Restaurar limites pelo painel cria uma revisão de configuração; não equivale a restaurar banco, dados ou software. Em falha de atualização, manter a aplicação parada e usar o plano de recuperação previamente ensaiado.
 
+## Atualização para o caderno experimental (003)
+
+Com backup validado e API/worker parados, aplique `npm run db:migrate`. A migração 003 adiciona `experiments`, `experiment_devices` e `experiment_notes`; não altera nem remove telemetria, credenciais, limites ou eventos existentes. Reabra o dashboard para carregar os novos módulos. O firmware atual continua compatível; a migração não exige regravar a placa.
+
+A CI também percorre 001 → 002 → 003 com dados já existentes. Não edite o checksum das migrações anteriores. Repositório independente é uma operação GitHub separada: consulte [REPOSITORY-INDEPENDENCE.md](REPOSITORY-INDEPENDENCE.md).
+
 ## Repositório comercial
 
 Não foi criado nem sincronizado repositório privado. Definir escopo, propriedade intelectual e licença com os autores antes de reutilizar a base. Não copiar histórico comprometido, dados pessoais ou segredos. O TG público deve continuar reproduzível sem dependência de módulo privado.

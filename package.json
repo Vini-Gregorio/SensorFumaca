@@ -15,7 +15,8 @@
     "test:browser": "node tests/browser/smoke.js",
     "test:firmware": "g++ -std=c++11 -Wall -Wextra -Werror -Iarduino/include tests/firmware.cpp -o /tmp/mqfire-firmware-test && /tmp/mqfire-firmware-test",
     "check:secrets": "node scripts/check-secrets.js",
-    "simulate": "node --env-file-if-exists=.env scripts/simulate.js"
+    "simulate": "node --env-file-if-exists=.env scripts/simulate.js",
+    "export:standalone": "node scripts/export-standalone.js"
   },
   "dependencies": {
     "bcrypt": "6.0.0",

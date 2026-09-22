@@ -2,6 +2,12 @@ import express from "express";
 import bcrypt from "bcrypt";
 import { fileURLToPath } from "node:url";
 import {
+  Experiments,
+  experimentInput,
+  noteInput,
+  conclusionInput,
+} from "./experiments.js";
+import {
   HttpError,
   token,
   hash,
@@ -49,7 +55,11 @@ function cookieToken(req) {
     ?.slice(15);
   return /^[a-f0-9]{64}$/.test(value || "") ? value : null;
 }
-export function createApp({ repo, config }) {
+export function createApp({
+  repo,
+  config,
+  experiments = new Experiments(repo),
+}) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxy || false);
@@ -316,6 +326,83 @@ export function createApp({ repo, config }) {
   );
   app.get("/api/v1/device/config", deviceAuth, async (req, res) =>
     res.json(await repo.config(req.device.id, req.deviceHash)),
+  );
+  const experimentId = (req) =>
+    integer(Number(req.params.id), 1, Number.MAX_SAFE_INTEGER, "Ensaio");
+  const experimentWriteLimit = limiter(30, 60000, (req) => req.user.id);
+  app.get("/api/v1/experiments", auth, async (req, res) =>
+    res.json(await experiments.list(req.user.id)),
+  );
+  app.post(
+    "/api/v1/experiments",
+    browserWrite,
+    auth,
+    experimentWriteLimit,
+    async (req, res) => {
+      const id = await experiments.create(
+        req.user.id,
+        experimentInput(req.body),
+      );
+      res.status(201).json({ id });
+    },
+  );
+  app.get("/api/v1/experiments/:id", auth, async (req, res) =>
+    res.json(await experiments.read(req.user.id, experimentId(req))),
+  );
+  app.post(
+    "/api/v1/experiments/:id/start",
+    browserWrite,
+    auth,
+    experimentWriteLimit,
+    async (req, res) => {
+      await experiments.start(req.user.id, experimentId(req));
+      res.status(204).end();
+    },
+  );
+  app.post(
+    "/api/v1/experiments/:id/notes",
+    browserWrite,
+    auth,
+    experimentWriteLimit,
+    async (req, res) => {
+      const id = await experiments.note(
+        req.user.id,
+        experimentId(req),
+        noteInput(req.body),
+      );
+      res.status(201).json({ id });
+    },
+  );
+  app.post(
+    "/api/v1/experiments/:id/finish",
+    browserWrite,
+    auth,
+    experimentWriteLimit,
+    async (req, res) => {
+      await experiments.finish(
+        req.user.id,
+        experimentId(req),
+        conclusionInput(req.body),
+      );
+      res.status(204).end();
+    },
+  );
+  app.get(
+    "/api/v1/experiments/:id/evidence",
+    auth,
+    limiter(5, 60000, (req) => req.user.id),
+    async (req, res) => {
+      const id = experimentId(req);
+      const window =
+        req.query.from !== undefined || req.query.to !== undefined
+          ? evidenceWindow(req.query)
+          : null;
+      res.set(
+        "Content-Disposition",
+        `attachment; filename="mqfire-experiment-${id}.json"`,
+      );
+      res.json(await experiments.evidence(req.user.id, id, window));
+    },
   );
   app.post(
     "/api/v1/telemetry",
