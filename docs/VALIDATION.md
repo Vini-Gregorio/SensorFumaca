@@ -1,6 +1,6 @@
 # Evidência da refatoração — 22/09/2026
 
-Este registro descreve verificações executadas, não certificação nem resultado de ensaio físico. A CI do PR é a referência para o commit efetivamente revisado.
+Este registro descreve verificações executadas, não certificação nem resultado de ensaio físico. A CI do [PR #7](https://github.com/Vini-Gregorio/SensorFumaca/pull/7) é a referência para o commit efetivamente revisado. [Primeira execução com software aprovado](https://github.com/Vini-Gregorio/SensorFumaca/actions/runs/35673354973).
 
 | Verificação | Resultado observado nesta execução |
 |---|---|
@@ -10,9 +10,9 @@ Este registro descreve verificações executadas, não certificação nem result
 | `npm audit --omit=dev` | 0 vulnerabilidades conhecidas após atualização do mysql2/lockfile; resultado pontual do registro npm |
 | `git diff --check` | Sem erros de whitespace na verificação local |
 | `npm run test:integration` local | Não executado com banco: Docker/MariaDB não disponíveis; tentativa de instalação bloqueada por permissões. Sem flag, teste explicitamente pulado |
-| Integração MariaDB na CI | Workflow configurado com banco dedicado, migrações e testes; verificar execução do PR |
-| Smoke Chromium | Em verificação; não declarar aprovado até resultado da execução |
-| Compilação ESP32 PlatformIO | Em verificação; não declarar aprovada até resultado da execução |
+| Integração MariaDB na CI | Aprovada no job software da execução 35673354973; migrações aplicadas duas vezes e testes com banco real |
+| Smoke Chromium | Aprovado na mesma CI: cadastro, login/cookie, dispositivo, chave, limites, histórico, XSS, mobile/desktop e logout |
+| Compilação ESP32 PlatformIO | Primeira CI encontrou inicialização incompatível com C++11; corrigida com construtor explícito e teste nativo alinhado a C++11. Conferir nova execução |
 | Carga k6 / hardware / Telegram real / campo | Não executados |
 | Revogação de segredos externos / limpeza do histórico | Não executadas; requerem responsável e coordenação |
 

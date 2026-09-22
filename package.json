@@ -10,7 +10,7 @@
     "test": "node --test tests/*.test.js",
     "test:integration": "node --env-file-if-exists=.env --test tests/integration/*.test.js",
     "test:browser": "node tests/browser/smoke.js",
-    "test:firmware": "g++ -std=c++17 -Wall -Wextra -Werror -Iarduino/include tests/firmware.cpp -o /tmp/mqfire-firmware-test && /tmp/mqfire-firmware-test",
+    "test:firmware": "g++ -std=c++11 -Wall -Wextra -Werror -Iarduino/include tests/firmware.cpp -o /tmp/mqfire-firmware-test && /tmp/mqfire-firmware-test",
     "check:secrets": "node scripts/check-secrets.js",
     "simulate": "node --env-file-if-exists=.env scripts/simulate.js"
   },

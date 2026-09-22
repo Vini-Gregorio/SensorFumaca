@@ -23,7 +23,7 @@ O MQ-2 entrega aqui **ADC bruto (0–4095), não PPM**. Limites 700/580 e confir
 - Git; Node.js 24.x e npm (veja `node --version`).
 - Docker com Compose v2 para o banco local, ou MariaDB 11.4 em banco vazio.
 - Para ESP32: Python 3.12, PlatformIO 6.1.18, cabo USB de dados e placa ESP32-WROOM-32/esp32dev.
-- Para testes do núcleo embarcado: compilador C++17 (`g++`). No Windows, use WSL ou execute essa etapa pela CI.
+- Para testes do núcleo embarcado: compilador C++11 (`g++`, mesmo padrão do framework fixado). No Windows, use WSL ou execute essa etapa pela CI.
 
 Não precisa de hardware nem Telegram para testar a API com o simulador. As dependências JS usam `package-lock.json`; `npm ci` reproduz o lockfile. Imagens Docker usam versão minor e podem receber patches; registre o digest usado em cada ensaio.
 

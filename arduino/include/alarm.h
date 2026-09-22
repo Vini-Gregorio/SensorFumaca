@@ -3,7 +3,12 @@
 
 // Núcleo sem Arduino: testável em computador. A nuvem nunca decide a saída física.
 enum class AlarmState { Warmup, Normal, Pending, Alarm, Fault };
-struct AlarmConfig { int high=700; int low=580; uint32_t confirmMs=5000; };
+struct AlarmConfig {
+  int high; int low; uint32_t confirmMs;
+  // Construtor explícito para o padrão C++11 do Arduino ESP32 2.x.
+  constexpr AlarmConfig(int highValue=700,int lowValue=580,uint32_t duration=5000)
+    : high(highValue),low(lowValue),confirmMs(duration) {}
+};
 inline bool validConfig(const AlarmConfig& c) {
   return c.low>=0 && c.low<c.high && c.high<=4095 && c.confirmMs>=100 && c.confirmMs<=60000;
 }
