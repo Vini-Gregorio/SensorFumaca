@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <time.h>
 #include "alarm.h"
 #if __has_include("secrets.h")
@@ -27,6 +28,7 @@ static constexpr uint32_t SAMPLE_MS=100,REPORT_MS=5000;
 // Espera inicial de demonstração: NÃO substitui condicionamento/calibração do fabricante.
 static constexpr uint32_t WARMUP_MS=60000;
 struct Sample {
+  uint64_t capturedMs; // idade sem rollover após ~49 dias de uptime
   uint32_t sequence,uptime,version,dropped;
   bool manual;
   int values[COUNT];
@@ -118,8 +120,9 @@ void networkTask(void*) {
     }
     if(!pending)pending=xQueueReceive(queueHandle,&sample,pdMS_TO_TICKS(100))==pdTRUE;
     if(!pending)continue;
-    const uint32_t age=uint32_t(millis()-sample.uptime);
-    if(age>86400000UL){pending=false;Serial.println("Amostra expirada (>24 h), descartada.");continue;}
+    const uint64_t age64=static_cast<uint64_t>(esp_timer_get_time()/1000)-sample.capturedMs;
+    if(age64>86400000ULL){pending=false;Serial.println("Amostra expirada (>24 h), descartada.");continue;}
+    const uint32_t age=static_cast<uint32_t>(age64);
     StaticJsonDocument<4096> doc;
     doc["deviceId"]=DEVICE_ID;doc["bootId"]=bootId;doc["sequence"]=sample.sequence;
     doc["uptimeMs"]=sample.uptime;doc["ageMs"]=age;doc["configVersion"]=sample.version;
@@ -166,7 +169,7 @@ void loop() {
   version=sharedVersion;for(size_t i=0;i<COUNT;i++)next[i]=sharedConfig[i];
   portEXIT_CRITICAL(&configMux);
   if(version!=appliedVersion){for(size_t i=0;i<COUNT;i++)alarms[i].configure(next[i]);appliedVersion=version;}
-  Sample sample{};sample.uptime=now;sample.version=appliedVersion;sample.manual=manualAlarm;sample.dropped=dropped;
+  Sample sample{};sample.capturedMs=static_cast<uint64_t>(esp_timer_get_time()/1000);sample.uptime=now;sample.version=appliedVersion;sample.manual=manualAlarm;sample.dropped=dropped;
   bool output=manualAlarm,changed=manualAlarm!=previousManual;previousManual=manualAlarm;
   for(size_t i=0;i<COUNT;i++) {
     const AlarmState before=alarms[i].state;

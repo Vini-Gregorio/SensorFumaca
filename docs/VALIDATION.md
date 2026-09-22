@@ -1,6 +1,6 @@
 # Evidência da refatoração — 22/09/2026
 
-Este registro descreve verificações executadas, não certificação nem resultado de ensaio físico. A CI do [PR #7](https://github.com/Vini-Gregorio/SensorFumaca/pull/7) é a referência para o commit efetivamente revisado. [Primeira execução com software aprovado](https://github.com/Vini-Gregorio/SensorFumaca/actions/runs/35673354973).
+Este registro descreve verificações executadas, não certificação nem resultado de ensaio físico. A CI do [PR #7](https://github.com/Vini-Gregorio/SensorFumaca/pull/7) é a referência para o commit efetivamente revisado. [Execução com software e firmware aprovados, commit 85b1828](https://github.com/Vini-Gregorio/SensorFumaca/actions/runs/35673586022). Alterações posteriores têm seus próprios checks no PR.
 
 | Verificação | Resultado observado nesta execução |
 |---|---|
@@ -10,9 +10,9 @@ Este registro descreve verificações executadas, não certificação nem result
 | `npm audit --omit=dev` | 0 vulnerabilidades conhecidas após atualização do mysql2/lockfile; resultado pontual do registro npm |
 | `git diff --check` | Sem erros de whitespace na verificação local |
 | `npm run test:integration` local | Não executado com banco: Docker/MariaDB não disponíveis; tentativa de instalação bloqueada por permissões. Sem flag, teste explicitamente pulado |
-| Integração MariaDB na CI | Aprovada no job software da execução 35673354973; migrações aplicadas duas vezes e testes com banco real |
+| Integração MariaDB na CI | Aprovada nas execuções 35673354973 e 35673586022; migrações aplicadas duas vezes e testes com banco real |
 | Smoke Chromium | Aprovado na mesma CI: cadastro, login/cookie, dispositivo, chave, limites, histórico, XSS, mobile/desktop e logout |
-| Compilação ESP32 PlatformIO | Primeira CI encontrou inicialização incompatível com C++11; corrigida com construtor explícito e teste nativo alinhado a C++11. Conferir nova execução |
+| Compilação ESP32 PlatformIO | Aprovada na execução 35673586022 após correção de inicialização C++11. Sem credenciais reais e sem gravação em hardware |
 | Carga k6 / hardware / Telegram real / campo | Não executados |
 | Revogação de segredos externos / limpeza do histórico | Não executadas; requerem responsável e coordenação |
 
