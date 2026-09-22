@@ -1,0 +1,10 @@
+.git
+node_modules
+.env
+.env.*
+arduino
+views
+tests
+docs
+*.pem
+*.key

@@ -1,0 +1,64 @@
+name: MQ-FIRE / validação TG
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  software:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-ephemeral-root-only
+          MARIADB_DATABASE: mqfire_test
+          MARIADB_USER: mqfire
+          MARIADB_PASSWORD: ci-ephemeral-db-only
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: mqfire_test
+      DB_USER: mqfire
+      DB_PASSWORD: ci-ephemeral-db-only
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check:secrets
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: npm run test:upgrade
+        env:
+          RUN_DB_TESTS: '1'
+      - run: npm run db:migrate
+      - run: npm run test:integration
+        env:
+          RUN_DB_TESTS: '1'
+      - run: npm run test:firmware
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: pip install platformio==6.1.18
+      - run: pio run

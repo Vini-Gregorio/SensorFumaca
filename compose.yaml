@@ -1,0 +1,19 @@
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:?Configure DB_NAME}
+      MARIADB_USER: ${DB_USER:?Configure DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Configure DB_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mqfire-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+volumes:
+  mqfire-db:

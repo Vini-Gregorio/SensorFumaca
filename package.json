@@ -1,25 +1,29 @@
 {
+  "name": "mq-fire-tg",
+  "version": "2.0.0-dev",
+  "private": true,
   "type": "module",
-  "dependencies": {
-    "axios": "^1.13.2",
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "express-session": "^1.18.2",
-    "mysql2": "^3.15.3",
-    "node-fetch": "^3.3.2",
-    "path": "^0.12.7",
-    "serialport": "^13.0.0",
-    "socket": "^1.1.25"
-  },
-  "devDependencies": {
-    "cross-env": "^10.1.0",
-    "jest": "^30.4.2",
-    "supertest": "^7.2.2"
+  "engines": {
+    "node": ">=24 <25"
   },
   "scripts": {
-    "start": "node backend/server.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules NODE_ENV=test jest"
+    "start": "node --env-file-if-exists=.env backend/server.js",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+    "test": "node --test tests/*.test.js",
+    "test:integration": "node --env-file-if-exists=.env --test --test-concurrency=1 tests/integration/*.test.js",
+    "test:upgrade": "node --env-file-if-exists=.env scripts/test-upgrade.js",
+    "test:browser": "node tests/browser/smoke.js",
+    "test:firmware": "g++ -std=c++11 -Wall -Wextra -Werror -Iarduino/include tests/firmware.cpp -o /tmp/mqfire-firmware-test && /tmp/mqfire-firmware-test",
+    "check:secrets": "node scripts/check-secrets.js",
+    "simulate": "node --env-file-if-exists=.env scripts/simulate.js",
+    "export:standalone": "node scripts/export-standalone.js"
+  },
+  "dependencies": {
+    "bcrypt": "6.0.0",
+    "express": "5.1.0",
+    "mysql2": "3.24.4"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
   }
 }
