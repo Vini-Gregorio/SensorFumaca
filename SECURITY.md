@@ -31,6 +31,9 @@ Nenhum valor vazado é reproduzido neste documento. O sanitizador local não per
 | Abuso/DoS | Corpo 16 KB, rate limit limitado em memória, tentativas de login limitadas | Um processo inicialmente; proxy e rate limit distribuído para escalar |
 | Exfiltração em logs | Erros genéricos; não registrar headers, payload completo ou URL Telegram | Provedores/proxy também precisam de política de logs |
 | Falha de rede bloqueando alarme | Tarefa de rede separada do loop físico | Validar watchdog, queda de energia e carga de rede no hardware |
+| Sobrescrita de limites | Versão esperada, lock, revisão e auditoria na mesma transação | Não valida a adequação física dos limites escolhidos |
+| Exportação de outra conta | Autorização por proprietário, intervalo/tamanho limitados, sem dados de conta | IDs e canais podem identificar local; pseudonimizar antes de publicar |
+| Resposta de worker antigo | Token por reserva de trabalho, conclusão condicionada ao token | Não elimina duplicidade por falha depois do aceite remoto |
 
 ## Comunicação de problemas
 
@@ -38,4 +41,6 @@ Não abra issue pública contendo credencial, dump de banco ou dado pessoal. Avi
 
 ## Dados e operação
 
-Coletar somente o necessário. Email e identificador de chat são dados de conta, não devem aparecer em conjuntos públicos do TG. Exportações de ensaios devem usar IDs pseudonimizados. Registrar consentimento/autorização do local, responsáveis, retenção e descarte. Política de retenção automática, backups agendados, recuperação de conta e auditoria administrativa são pendências de operação, não funcionalidades prontas.
+Coletar somente o necessário. Email e identificador de chat são dados de conta, não devem aparecer em conjuntos públicos do TG. Exportações de ensaios devem usar IDs pseudonimizados. Registrar consentimento/autorização do local, responsáveis, retenção e descarte. Política de retenção automática, backups agendados e recuperação de conta são pendências de operação, não funcionalidades prontas.
+
+Há histórico de criação de dispositivo/canal, edição/restauração de limites, rotação/desativação, mudança de destino e reenvio, visível somente ao proprietário. Esse log não é imutável diante de quem controla o banco e não cobre login, consultas nem toda operação administrativa. O hash de uma exportação não é assinatura digital; quem altera o conteúdo também pode recalculá-lo. Não tratá-lo como prova de autoria ou de integridade de origem.

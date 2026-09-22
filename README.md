@@ -12,11 +12,13 @@ Este repositório é a versão **acadêmica, didática e replicável** do projet
 - Até oito canais MQ-2 por dispositivo no contrato; o firmware vem com um canal em GPIO 34. Outros tipos de sensor precisam de adaptador/unidade própria, ainda não implementados.
 - Telemetria autenticada, validação, idempotência e transação: só confirma depois de persistir.
 - Histerese e confirmação **no ESP32**, sem depender da rede; configuração versionada e cache em flash.
-- Dashboard web/mobile responsivo com leituras, histórico, limites, credenciais e notificações. Não é um aplicativo Android nativo.
-- Telegram com outbox transacional, timeout, tentativas limitadas e estado de entrega. Desligado por padrão.
+- Histórico das configurações, restauração como nova versão e proteção contra edições concorrentes.
+- Dashboard web/mobile responsivo com leituras, tendência ADC, diagnóstico da placa e aviso de perda de atualização. Não é um aplicativo Android nativo.
+- Exportação privada de evidências com leituras, configurações, diagnóstico e hash de integridade; histórico de alterações por proprietário.
+- Telegram com outbox transacional, timeout, tentativas limitadas, respeito a `retry_after` e reenvio manual identificado. Desligado por padrão.
 - Testes de API/domínio, integração MariaDB e núcleo C++ do alarme, mais compilação do firmware na CI.
 
-O MQ-2 entrega aqui **ADC bruto (0–4095), não PPM**. Limites 700/580 e confirmação de 5 s são parâmetros iniciais de demonstração, não calibração comprovada. A IA é uma etapa futura de pesquisa; não há modelo treinado nem tomada de decisão por IA nesta versão. Consulte [arquitetura](docs/ARCHITECTURE.md), [contrato](docs/API.md) e [plano do TG](docs/TG-ROADMAP.md).
+O MQ-2 entrega aqui **ADC bruto (0–4095), não PPM**. Limites 700/580 e confirmação de 5 s são parâmetros iniciais de demonstração, não calibração comprovada. A IA é uma etapa futura de pesquisa; não há modelo treinado nem tomada de decisão por IA nesta versão. Consulte [arquitetura](docs/ARCHITECTURE.md), [contrato](docs/API.md), [plano do TG](docs/TG-ROADMAP.md) e [prioridades de evolução](docs/EVOLUTION.md).
 
 ## 1. Pré-requisitos
 
@@ -106,7 +108,9 @@ O arquivo `arduino/sensor.cpp` é **C++ para Arduino**, não C puro. A lógica d
 
 ### Fluxo local e limites conhecidos
 
-Amostragem a cada 100 ms → histerese/confirmação → saída física → fila de telemetria. A rede roda em outra tarefa. Publicação a cada 5 s ou mudança de estado. A fila tem 64 amostras em RAM, cerca de 5 minutos sem mudanças extras: pode perder amostras se encher e é perdida no reinício. O contador de perdas por fila cheia aparece no painel. Não há armazenamento offline durável; HTTP recusado ou amostra expirada também pode causar perda (diagnóstico serial). Não há teste automático de sensor desconectado, de relé ou de sirene: o estado `FAULT` não cobre todos os defeitos físicos.
+Amostragem a cada 100 ms → histerese/confirmação → saída física → fila de telemetria. A rede roda em outra tarefa. Publicação a cada 5 s ou mudança de estado. A fila reserva **32 posições para mudanças de estado**, em ordem, e mantém apenas a leitura periódica mais recente; pode haver ainda uma amostra em envio. Mudanças de estado têm prioridade sobre periódicas, inclusive uma periódica aguardando repetição. Isso limita memória e evita que leituras normais antigas atrasem mudanças de alarme.
+
+`coalescedSamples` conta periódicas substituídas intencionalmente; `droppedSamples` conta fila crítica cheia, expiração após 24 h ou recusa definitiva do contrato. Ambos são cumulativos no boot e reportados no próximo pacote selecionado. A capacidade é finita: não há garantia de preservar toda transição durante uma interrupção prolongada. **A fila é perdida no reinício**; não há armazenamento offline durável. Não há teste automático de sensor desconectado, de relé ou de sirene: o estado `FAULT` não cobre todos os defeitos físicos.
 
 Limites editados no painel ficam pendentes até a versão aplicada aparecer na telemetria. A configuração é consultada a cada 30 s e gravada em flash quando muda. Para adicionar canal: cadastre no painel, acrescente ID/pino ADC1 em `CHANNELS` e recompile. A configuração é aplicada por inteiro; se os canais não coincidirem, o ESP32 mantém a última configuração válida e informa rejeição no serial. Ao reutilizar uma placa em outra instalação, limpe a configuração NVS conscientemente e reprovisione — não transporte limites de outro ambiente.
 
@@ -114,7 +118,9 @@ Limites editados no painel ficam pendentes até a versão aplicada aparecer na t
 
 Crie/controle seu bot, obtenha um token novo e mantenha-o somente no `.env`/gerenciador de segredos. Configure `TELEGRAM_ENABLED=true` e `TELEGRAM_BOT_TOKEN`; reinicie o servidor. Inicie uma conversa com o bot e cadastre no painel apenas seu chat ou grupo autorizado.
 
-Uma transição para alarme cria uma entrega na outbox; alarme contínuo não gera mensagem a cada leitura. Consulte `pending`, `sending`, `sent`, `failed` ou `disabled` no painel. `sent` significa aceitação pela API Telegram, não leitura pelo destinatário. Mensagens podem se repetir caso a API confirme e o processo caia antes de persistir o resultado. Mensagens sem destinatário falham explicitamente. Não há botão de reenvio nesta versão; não reutilize eventos antigos como ensaio novo. Outros canais são roadmap.
+Uma transição para alarme cria uma entrega na outbox; alarme contínuo não gera mensagem a cada leitura. Consulte `pending`, `sending`, `sent`, `failed` ou `disabled` no painel. `sent` significa aceitação pela API Telegram, não leitura pelo destinatário. Mensagens podem se repetir caso a API confirme e o processo caia antes de persistir o resultado. Mensagens sem destinatário falham explicitamente.
+
+Após corrigir a causa, entregas `failed`/`disabled` podem ser reenviadas pelo painel, até três vezes por entrega, com confirmação explícita. O bot precisa estar habilitado e um destinatário atual configurado. A mensagem leva o aviso **REENVIO MANUAL: evento histórico**, preserva a data do evento e deixa registro de alteração. Isso não é ensaio novo. O worker limita cada rodada a cinco tentativas e respeita `retry_after` do Telegram até 24 h; uma resposta atrasada de um worker antigo não pode concluir a tentativa de outro. Outros canais são roadmap.
 
 ## 5. Executar verificações
 
@@ -128,15 +134,26 @@ npm audit --omit=dev
 pio run
 ```
 
-A integração requer banco **descartável separado**, cujo nome termine em `_test`. Defina as variáveis de conexão para esse banco, execute `npm run db:migrate` e `RUN_DB_TESTS=1 npm run test:integration` (PowerShell: `$env:RUN_DB_TESTS='1'`). Sem a flag, o teste é **pulado**, não validado. A CI cria MariaDB próprio, aplica migrações duas vezes e executa a integração. Não aponte testes para o banco de campo.
+A integração requer banco **descartável separado**, cujo nome termine em `_test`. Defina as variáveis de conexão para esse banco, execute `npm run db:migrate` e `RUN_DB_TESTS=1 npm run test:integration` (PowerShell: `$env:RUN_DB_TESTS='1'`). Sem a flag, o teste é **pulado**, não validado. A CI cria MariaDB próprio e verifica atualização 001 → 002 com dados existentes, repetição das migrações e integração. Para reproduzir o ensaio de atualização, use `RUN_DB_TESTS=1 npm run test:upgrade` antes das outras etapas, em banco de teste **vazio**: ele recusa banco já populado e não apaga tabelas. Não aponte testes para o banco de campo.
 
 O smoke de navegador usa Chromium e dublê do banco: não substitui a integração SQL. O inventário e a evidência da refatoração estão em [VALIDATION.md](docs/VALIDATION.md). Testes de carga, segurança operacional e campo têm critérios e pendências no [plano do TG](docs/TG-ROADMAP.md). Aprovar CI não comprova precisão, conformidade ou confiabilidade do protótipo físico.
 
 Roteiro de carga inicial: `tests/load/telemetry.k6.js` (k6 instalado separadamente), somente localhost e com `ALLOW_LOAD_TESTS=1`, `DEVICE_ID` e `DEVICE_API_KEY` no ambiente. Comando: `k6 run tests/load/telemetry.k6.js`. Usa 2 VUs/30 s; metas experimentais iniciais p95 <500 ms e erro <1%, a confirmar antes do ensaio. Não desative o rate limit para mascarar saturação; mais de 120 requisições/minuto por dispositivo deve gerar 429. Ensaios com muitos dispositivos exigem identidades distintas e roteiro ampliado. Nenhum resultado de carga é presumido.
 
-## 6. Implantação e atualização
+## 6. Conduzir um ensaio rastreável
 
-- Faça backup e ensaie restauração; use banco V2 novo. [Migração](docs/MIGRATION.md).
+1. Registre objetivo, critério de aceite, montagem, condições, commit e procedimento aprovado no [modelo do TG](docs/TG-ROADMAP.md). Configure os limites antes do ensaio; guarde a justificativa.
+2. Confira no painel **versão aplicada = desejada**. Salvar uma edição não comprova que o ESP32 já a recebeu. Conflito `409` ao editar significa que outra alteração ocorreu: feche o formulário, atualize e confira os valores antes de tentar novamente.
+3. Em **Versões dos limites**, consulte o histórico. Restaurar cria uma versão nova, sem apagar a anterior; só funciona quando os canais são os mesmos. É necessário aguardar sua aplicação na placa.
+4. Acompanhe **Saúde do dispositivo**: versão do firmware, RSSI, memória livre, fila, substituições e motivo do boot. São diagnósticos do primeiro envio daquele pacote, não medições do ambiente. `OFFLINE` significa observação antiga; `SEM ATUALIZAÇÃO` significa que o navegador ficou mais de 25 s sem atualizar pela API.
+5. Em **Exportar evidências do ensaio**, informe dispositivo, início e fim no horário local do navegador. O arquivo usa UTC, intervalo `[início,fim)`, no máximo 24 h e 10.000 leituras. Se exceder, divida o intervalo: o sistema recusa, sem truncar silenciosamente.
+6. Guarde o JSON com protocolo e anotações independentes do ensaio. Ele inclui configurações conhecidas, dados brutos e hash SHA-256; versões antigas sem histórico são listadas em `missingConfigVersions`. O hash detecta alterações no conteúdo, **não comprova autenticidade nem precisão**. Antes de publicar, pseudonimize IDs/local e mantenha separada a cópia original privada.
+
+O gráfico exibe até 100 registros, com espaçamento por ordem de registro, não por tempo; pode conter lacunas. O estado `ALARM` declarado pelo dispositivo não é rótulo independente de presença de fumaça. Não use esse estado como verdade de campo para "provar" a própria regra ou treinar IA sem avaliação externa.
+
+## 7. Implantação e atualização
+
+- Faça backup e ensaie restauração; use banco V2 novo ao sair do legado. Se já usa a V2 com migração 001, pare API/worker e aplique a migração aditiva 002 antes de iniciar esta versão. [Migração](docs/MIGRATION.md).
 - Disponibilize HTTPS por proxy reverso. `NODE_ENV=production`, `APP_ORIGIN=https://seu-host`, `ALLOW_REGISTRATION=false` após provisionar contas. Sem tela administrativa de convite nesta versão.
 - `TRUST_PROXY=1` apenas atrás de **um proxy confiável**, com acesso direto à API bloqueado. No acesso direto, use `0`.
 - Configure TLS do banco com `DB_TLS_CA_FILE` para conexões fora de rede privada. Use usuário restrito; não use root na aplicação.

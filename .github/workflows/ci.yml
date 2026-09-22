@@ -43,7 +43,9 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
-      - run: npm run db:migrate
+      - run: npm run test:upgrade
+        env:
+          RUN_DB_TESTS: '1'
       - run: npm run db:migrate
       - run: npm run test:integration
         env:

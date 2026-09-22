@@ -28,6 +28,17 @@ Base: `testes-git` em `83e45910af471882a3bcdfa73701e618d9d31100`, seis commits �
 
 MariaDB/MySQL fazem commits implícitos em DDL. O migrador registra checksum e não promete transação de esquema. Uma falha no meio pode deixar tabelas criadas; pare, inspecione a causa e restaure um banco de teste novo ou backup validado. Não execute comandos de remoção de tabelas automaticamente. Arquivo de migração aplicado não deve ser editado; crie um novo numerado.
 
+## Atualização de uma instalação V2 com migração 001
+
+1. Faça backup privado e ensaie a restauração em ambiente separado. Pare API/worker antes de migrar; não misture versões de aplicação durante a atualização.
+2. Atualize código e dependências fixadas; execute `npm run db:migrate`. A 001 permanece com checksum original. A 002 adiciona revisões, auditoria, diagnóstico e controle de tentativas, sem remover dados.
+3. A revisão inicial de cada dispositivo recebe a versão e limites atualmente existentes, com motivo `baseline_migration`. Não há snapshots fabricados de versões anteriores; exportações mostrarão essa lacuna.
+4. Reinicie a aplicação; reabra o dashboard para carregar o cliente novo. PUT de limites passa a exigir `expectedVersion`. Clientes antigos de edição precisam ser atualizados.
+5. Telemetria V2 sem `diagnostics` continua aceita e mantém a identidade dos pacotes antigos. Grave o firmware novo para obter diagnóstico e a nova política de fila; não confunda compilação com validação física.
+6. Confira conta, configuração, histórico, simulador e autorização. A CI ensaia 001 → 002 com limites já alterados, repetição das migrações e transações reais. Isso não substitui o ensaio com seu backup.
+
+Não há migração reversa automatizada. Restaurar limites pelo painel cria uma revisão de configuração; não equivale a restaurar banco, dados ou software. Em falha de atualização, manter a aplicação parada e usar o plano de recuperação previamente ensaiado.
+
 ## Repositório comercial
 
 Não foi criado nem sincronizado repositório privado. Definir escopo, propriedade intelectual e licença com os autores antes de reutilizar a base. Não copiar histórico comprometido, dados pessoais ou segredos. O TG público deve continuar reproduzível sem dependência de módulo privado.

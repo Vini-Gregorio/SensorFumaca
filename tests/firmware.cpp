@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 #include "alarm.h"
+#include "delivery_queue.h"
 int main(){
   Alarm a;
   assert(a.update(800,0,false)==AlarmState::Warmup);
@@ -21,5 +22,16 @@ int main(){
   assert(!validConfig({500,500,1000}));assert(!validConfig({4096,0,1000}));
   DebouncedButton b;assert(!b.update(true,0));assert(!b.update(false,10));assert(!b.update(true,20));assert(b.update(true,70));assert(!b.update(true,100));
   assert(std::strcmp(stateName(AlarmState::Pending),"PENDING")==0);
+  DeliveryQueue<int,2> queue;
+  queue.enqueue(10,false);queue.enqueue(11,false);
+  assert(queue.coalesced()==1);
+  queue.enqueue(20,true);queue.enqueue(21,true);
+  assert(queue.coalesced()==2);assert(!queue.enqueue(22,true));assert(queue.dropped()==1);
+  queue.enqueue(30,false);assert(queue.depth()==3);
+  int out=0;assert(queue.popCritical(out)&&out==20);assert(queue.popCritical(out)&&out==21);
+  assert(!queue.popCritical(out));assert(queue.popLatest(out)&&out==30);
+  assert(!queue.popLatest(out));queue.discard();assert(queue.dropped()==2);
+  Alarm second;assert(!second.active);assert(a.active); // canais não compartilham estado
   std::cout<<"Firmware: histerese, confirmação, falha, configuração, debounce e rollover OK\n";
+  std::cout<<"Fila: prioridade, FIFO, coalescência, saturação e perdas OK\n";
 }

@@ -14,9 +14,14 @@ Base `/api/v1`. JSON UTF-8, corpo até 16 KB, erros `{ "error": "mensagem" }`. H
 | POST `/devices/:id/rotate-key` | `{}` | Nova chave; antiga deixa de funcionar |
 | PUT `/devices/:id/enabled` | `enabled` booleano | 204; não controla saída física |
 | POST `/devices/:id/sensors` | `channel`, `name`, `high`, `low`, `confirmMs` | 201; novo canal MQ2/adc_raw |
-| PUT `/devices/:id/sensors/:channel/config` | `high`, `low`, `confirmMs` | Nova versão pendente de sincronização |
+| PUT `/devices/:id/sensors/:channel/config` | `high`, `low`, `confirmMs`, `expectedVersion` | Nova `version` pendente de sincronização; 409 se a versão mudou |
+| GET `/devices/:id/config/revisions` | — | Últimas 100 configurações completas e motivos |
+| POST `/devices/:id/config/restore` | `version`, `expectedVersion` | Nova versão com limites restaurados; exige mesmos canais |
 | GET `/devices/:id/sensors/:channel/readings` | `?before=<id>` opcional | Até 100 registros, ID decrescente; use menor ID como próximo cursor |
+| GET `/devices/:id/evidence` | `?from=<UTC ISO>&to=<UTC ISO>` | JSON privado de evidências; no máximo 24 h/10.000 leituras |
+| GET `/audit` | — | Últimas 100 alterações do proprietário, sem valores de segredos |
 | GET `/notifications` | — | Últimos 100 estados de entrega do proprietário |
+| POST `/notifications/:id/retry` | `{}` | 202; reenvio manual de `failed`/`disabled`, até três por entrega |
 | GET `/device/config` | Headers de dispositivo | Versão e todos os canais/limites |
 | POST `/telemetry` | Headers de dispositivo e pacote abaixo | 201 novo / 200 duplicata, somente após commit |
 
@@ -32,6 +37,14 @@ Headers de dispositivo: `x-device-id` e `x-api-key` (64 caracteres hexadecimais 
   "configVersion": 1,
   "droppedSamples": 0,
   "manualAlarm": false,
+  "diagnostics": {
+    "firmware": "2.1.0-tg",
+    "rssi": -60,
+    "freeHeap": 90000,
+    "queueDepth": 1,
+    "coalescedSamples": 0,
+    "resetReason": 1
+  },
   "readings": [{"channel": "mq2", "value": 400, "state": "NORMAL"}]
 }
 ```
@@ -42,10 +55,11 @@ Headers de dispositivo: `x-device-id` e `x-api-key` (64 caracteres hexadecimais 
 - De 1 a 8 canais distintos, previamente cadastrados. Canais recém-adicionados podem permanecer sem dados até firmware atualizado.
 - `value`: inteiro 0–4095 ADC bruto. Estados: `WARMUP`, `NORMAL`, `PENDING`, `ALARM`, `FAULT`.
 - `manualAlarm`: acionamento manual; pode coexistir com leitura normal. Saída física é OR dos alarmes locais e manual.
-- `droppedSamples`: contador cumulativo de perda por fila cheia no boot. Não representa todo tipo de perda possível.
+- `droppedSamples`: contador cumulativo no boot: fila crítica cheia, expiração ou recusa definitiva do contrato. Não conta perdas de RAM ao reiniciar. Periódicas substituídas ficam em contador separado.
+- `diagnostics`: opcional para compatibilidade com a V2 anterior; se presente, exige todos os campos do exemplo. `firmware`: até 40 caracteres alfanuméricos, `.`, `_`, `+`, `-`; `rssi`: −127 a 0 dBm; `freeHeap`: uint32 em bytes; `queueDepth`: 0–65; `coalescedSamples`: uint32; `resetReason`: 0–255 (código do ESP32). O firmware congela esse diagnóstico no **primeiro envio**, não na captura do ADC: não modificar durante retries.
 - `high`: 1–4095; `low`: 0 até `high-1`; `confirmMs`: 100–60.000.
 
-401: credencial/sessão inválida. 403: origem ou vínculo do payload inválido. 404: recurso web não existe ou não pertence à conta. 409: duplicidade de cadastro/conflito de evento/versão futura. 413: corpo grande. 422: canal desconhecido. 429: limite de taxa. 5xx: não considerar leitura confirmada; repetir com **mesmo bootId/sequence e mesmo conteúdo**, alterando apenas idade.
+401: credencial/sessão inválida. 403: origem ou vínculo do payload inválido. 404: recurso web não existe ou não pertence à conta. 409: duplicidade de cadastro/conflito de evento/versão futura/edição concorrente/ação incompatível. 413: corpo grande ou exportação excedendo 10.000 leituras. 422: canal desconhecido. 429: limite de taxa. 5xx: não considerar leitura confirmada; repetir com **mesmo bootId/sequence e mesmo conteúdo**, alterando apenas idade.
 
 Resposta de configuração:
 
@@ -54,3 +68,13 @@ Resposta de configuração:
 ```
 
 Repetição idempotente impede duplicar a linha de evento; não impede uma placa comprometida de produzir eventos falsos com uma chave válida. Não há autenticação por certificado de cliente, assinatura individual ou atestado de hardware nesta fase.
+
+## Evidências e manutenção
+
+Exportação: `from` e `to` devem ser ISO UTC com `Z` (segundos obrigatórios, milissegundos opcionais com três dígitos). Intervalo maior que zero, até 24 h, início inclusivo/fim exclusivo. Limite de cinco exportações/minuto por conta, além do limitador geral. Resposta `{payload,sha256,hashEncoding}`: SHA-256 de `JSON.stringify(payload)` UTF-8. Não é assinatura digital. Cabeçalhos `Cache-Control: no-store` e `Content-Disposition: attachment`. Nenhum dado é truncado ao exceder o limite.
+
+O pacote reúne configurações correspondentes às versões das leituras e indica versões ausentes. Não inclui email, destino Telegram, credenciais ou nome cadastrado do dispositivo. IDs/canais ainda podem revelar o local; tratar o arquivo como privado até pseudonimização. Registros antigos sem diagnóstico têm `diagnostics: null`.
+
+Reenvio: exige bot habilitado, destino atual configurado, estado `failed`/`disabled` e menos de três reenvios. Cada rodada reinicia o contador de tentativas automáticas e registra a ação em auditoria. O texto é marcado como evento histórico. Limite de dez solicitações/minuto por conta. Um `202` não comprova entrega: consultar `/notifications` para estado, tentativas, reenvios e `error_code`.
+
+`expectedVersion` é a versão desejada vista pelo editor, não a aplicada pela placa. Edição/restauração valida a versão e grava configuração, revisão e auditoria na mesma transação. Em `409`, recarregar e revisar valores: não repetir sobrescrevendo automaticamente. A restauração mantém a numeração crescente e não remove canais.

@@ -2,6 +2,8 @@
 
 O objetivo é ligar requisito → implementação → teste → evidência → afirmação no texto. Nenhum item abaixo marcado pendente pode ser descrito no relatório como resultado obtido.
 
+As sugestões de evolução, critérios de aceite e recorte da IA estão em [EVOLUTION.md](EVOLUTION.md). O painel já permite exportar evidências com configurações versionadas; o pesquisador ainda precisa registrar protocolo, montagem e rótulos independentes.
+
 ## Marcos e critérios de aceite
 
 | Prioridade / marco | Entrega | Evidência exigida | Estado inicial desta refatoração |
@@ -11,7 +13,7 @@ O objetivo é ligar requisito → implementação → teste → evidência → a
 | P0 — ponta a ponta em bancada | ADC → saída local → persistência → painel → Telegram | Tempos, logs pseudonimizados, versão e ambiente; ensaio com rede disponível/indisponível | Pendente em hardware |
 | P1 — caracterização do MQ-2 | Baseline, variabilidade, condicionamento e limiares justificados | Planilha de dados brutos, método, repetições, ambiente e limitações | Pendente; não declarar PPM/calibração metrológica |
 | P1 — múltiplos canais | Dois dispositivos e ao menos dois canais em uma placa | IDs isolados, limites independentes, consumo, teste de falha de um canal | Contrato/firmware preparados; montagem/ensaio pendentes |
-| P1 — qualidade e operação | Segurança, carga, backup/restore, retenção e falhas | Relatórios reproduzíveis, limites explicitados e issues de correção | Parte automatizada; operação/carga pendentes |
+| P1 — qualidade e operação | Segurança, carga, backup/restore, retenção e falhas | Relatórios reproduzíveis, limites explicitados e issues de correção | Versões, auditoria, evidências e recuperação de notificações implementadas; operação/carga pendentes |
 | P1 — texto e defesa | Arquitetura, resultados e limitações coerentes com evidências | Matriz de rastreabilidade, tabelas de resultados, revisão do orientador | Pendente de atualização do documento do TG |
 | P2 — IA consultiva | Dataset autorizado, baseline e comparação offline | Separação temporal por sessão, métricas, model card, código/seed | Planejamento; nenhum modelo implementado |
 | P2 — expansão | Outros sensores, canais de alerta, OTA e app nativo | ADR por funcionalidade e teste de regressão | Futuro; fora do mínimo defendível atual |
@@ -21,7 +23,7 @@ O objetivo é ligar requisito → implementação → teste → evidência → a
 | Categoria | Casos | Critério / cuidado |
 |---|---|---|
 | Funcional local | Igualdade nos limiares, histerese, confirmação interrompida, botão, reboot, rollover | Saída conforme máquina de estados; capturar versão/config |
-| Integração | Falha DB, retry do mesmo evento, chave rotacionada, dois proprietários, config offline | Nenhum ACK antes do commit; sem duplicação; isolamento e versão visíveis |
+| Integração | Falha DB, retry do mesmo evento, chave rotacionada, dois proprietários, edição concorrente, restauração, upgrade | Nenhum ACK antes do commit; sem duplicação; isolamento, versões e atomicidade verificáveis |
 | Rede/energia | Wi-Fi ausente, DNS/HTTPS lento, servidor fora, reinício, fila cheia | Alarme local continua; perdas e limites documentados |
 | Notificação | Chat autorizado, token inválido, timeout, 429, duplicidade por crash | Persistência de estado; não confundir aceite Telegram com leitura humana |
 | Carga | Começar com 2/10/50 dispositivos simulados, aumentar somente em ambiente autorizado | Medir p50/p95/p99, erros, fila e memória; definir metas antes do ensaio |
@@ -39,6 +41,8 @@ Teste de unidade não mede taxa de detecção. Teste doméstico relatado anterio
 - Ambiente, montagem, procedimento seguro aprovado, duração e número de repetições.
 - Leituras brutas; latência local/API/dashboard/Telegram separadamente; dados ausentes e perdas.
 - Resultado, falhas, limitações, link para dados autorizados; mudança exigida no relatório.
+
+No painel, exporte JSON por dispositivo e intervalo de até 24 h (máximo 10.000 leituras); guarde o original privado e seu hash. Complete com anotações do procedimento e rótulos independentes. `missingConfigVersions` indica ausência de histórico de limites; não preencher por memória como se fosse snapshot comprovado. Diagnósticos do firmware são do primeiro envio e podem ocorrer depois da captura da amostra.
 
 Não adicionar credenciais, emails, chat IDs ou dados pessoais reais aos exemplos públicos.
 

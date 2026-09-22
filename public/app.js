@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 let signedIn = false,
   refreshing = false;
+let visibleReadings = [],
+  lastRefresh = 0;
 function message(value) {
   $("message").textContent = value;
 }
@@ -29,6 +31,12 @@ function showAuth() {
     $("api-key").textContent = "";
     $("credential").hidden = true;
     $("detail-data").textContent = "";
+    $("detail-actions").replaceChildren();
+    $("detail").hidden = true;
+    $("telegram").reset();
+    $("evidence").reset();
+    visibleReadings = [];
+    lastRefresh = 0;
   }
 }
 function formData(id) {
@@ -62,15 +70,140 @@ function detail(title, data) {
   $("detail-title").textContent = title;
   $("detail-data").textContent = JSON.stringify(data, null, 2);
   $("detail").hidden = false;
+  $("detail-actions").replaceChildren();
+}
+function liveState(row) {
+  if (!row.enabled) return "DESATIVADO";
+  if (!lastRefresh || Date.now() - lastRefresh > 25000)
+    return "SEM ATUALIZAÇÃO";
+  if (
+    row.observed_at &&
+    Date.now() - new Date(row.observed_at).getTime() > 90000
+  )
+    return "OFFLINE";
+  return row.status;
+}
+function updateVisibleStates() {
+  for (const row of visibleReadings) {
+    const card = [...document.querySelectorAll(".card")].find(
+      (c) => c.dataset.sensorId === String(row.sensor_id),
+    );
+    if (!card) continue;
+    const state = card.querySelector(".state");
+    state.textContent = liveState(row);
+    state.dataset.state = liveState(row);
+    card.querySelector(".value").textContent =
+      row.value == null ? "—" : `${row.value} ADC`;
+    card.querySelector(".observed").textContent = row.observed_at
+      ? `Observação: ${new Date(row.observed_at).toLocaleString("pt-BR")}`
+      : "Nenhuma leitura.";
+  }
+}
+async function showRevisions(row) {
+  const revisions = await api(`/devices/${row.device_id}/config/revisions`);
+  detail(`Versões de configuração · ${row.device_id}`, revisions);
+  for (const r of revisions) {
+    if (r.version === row.desired_version) continue;
+    const button = element(
+      "button",
+      `Restaurar limites da versão ${r.version}`,
+    );
+    button.onclick = () =>
+      run(async () => {
+        if (
+          !confirm(
+            `Restaurar os limites da versão ${r.version}? Será criada uma nova versão, enviada ao ESP32. Confira a adequação ao ensaio antes de confirmar.`,
+          )
+        )
+          return;
+        await api(`/devices/${row.device_id}/config/restore`, "POST", {
+          version: r.version,
+          expectedVersion: row.desired_version,
+        });
+        detail(
+          "Restauração solicitada",
+          "Aguarde a confirmação da nova versão pelo dispositivo.",
+        );
+        await refresh();
+      });
+    $("detail-actions").append(button);
+  }
+}
+function showHistory(row, readings) {
+  detail(`Histórico · ${row.device_id} / ${row.channel}`, readings);
+  if (!readings.length) return;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 600 180");
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    "Tendência das leituras brutas ADC, de zero a 4095, em ordem de registro.",
+  );
+  svg.classList.add("trend");
+  const points = readings
+    .slice()
+    .reverse()
+    .map(
+      (r, i) =>
+        `${10 + (i * 580) / Math.max(1, readings.length - 1)},${170 - (r.value * 150) / 4095}`,
+    )
+    .join(" ");
+  const line = document.createElementNS(ns, "polyline");
+  line.setAttribute("points", points);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", "currentColor");
+  line.setAttribute("stroke-width", "2");
+  svg.append(line);
+  $("detail-actions").append(
+    element(
+      "p",
+      "Tendência ADC (0–4095). Espaçamento por ordem de registro, não por tempo; trechos podem conter lacunas.",
+    ),
+    svg,
+  );
+}
+async function showNotifications() {
+  const rows = await api("/notifications");
+  detail("Entregas de notificações", rows);
+  for (const row of rows.filter(
+    (r) => ["failed", "disabled"].includes(r.status) && r.retry_count < 3,
+  )) {
+    const b = element("button", `Reenviar evento ${row.event_id}`);
+    b.onclick = () =>
+      run(async () => {
+        if (
+          !confirm(
+            "Reenviar este evento histórico ao destinatário atualmente configurado? A mensagem será identificada como reenvio manual.",
+          )
+        )
+          return;
+        await api(`/notifications/${row.id}/retry`, "POST", {});
+        await showNotifications();
+        message("Reenvio registrado. Confira o resultado na lista.");
+      });
+    $("detail-actions").append(b);
+  }
 }
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
     const rows = await api("/devices");
+    if (!signedIn) return;
+    visibleReadings = rows;
+    lastRefresh = Date.now();
+    $("updated").textContent =
+      `Atualizado ${new Date().toLocaleTimeString("pt-BR")}`;
+    // Atualizar leituras sem destruir um formulário que está sendo preenchido.
+    if (document.querySelector(".card details[open]")) {
+      updateVisibleStates();
+      return;
+    }
     const cards = [];
     for (const row of rows) {
       const card = element("article", "", "card");
+      card.dataset.sensorId = row.sensor_id;
       card.append(element("h3", `${row.device_name} · ${row.name}`));
       const status = element("span", row.status, "state");
       status.dataset.state = row.status;
@@ -82,7 +215,7 @@ async function refresh() {
       card.append(
         element(
           "p",
-          `Configuração: aplicada ${row.config_version ?? "—"} / desejada ${row.desired_version}. Perdas na fila: ${row.dropped_samples ?? "—"}.`,
+          `Configuração: aplicada ${row.config_version ?? "—"} / desejada ${row.desired_version}. Perdas reportadas: ${row.dropped_samples ?? "—"}.`,
         ),
       );
       card.append(
@@ -91,19 +224,43 @@ async function refresh() {
           row.observed_at
             ? `Observação: ${new Date(row.observed_at).toLocaleString("pt-BR")}`
             : "Nenhuma leitura.",
+          "observed",
         ),
       );
       const history = element("button", "Histórico (100)");
       history.onclick = () =>
         run(async () =>
-          detail(
-            `${row.device_id} / ${row.channel}`,
+          showHistory(
+            row,
             await api(
               `/devices/${row.device_id}/sensors/${row.channel}/readings`,
             ),
           ),
         );
       card.append(history);
+      const revisions = element("button", "Versões dos limites");
+      revisions.onclick = () => run(() => showRevisions(row));
+      card.append(revisions);
+      const diagnostics = document.createElement("details");
+      diagnostics.append(element("summary", "Saúde do dispositivo"));
+      diagnostics.append(
+        element(
+          "p",
+          row.last_contact_at
+            ? `Último contato com a API: ${new Date(row.last_contact_at).toLocaleString("pt-BR")}`
+            : "Contato ainda não registrado.",
+        ),
+      );
+      const d = row.diagnostics;
+      diagnostics.append(
+        element(
+          "p",
+          d
+            ? `Firmware ${d.firmware}; Wi-Fi ${d.rssi} dBm; memória livre ${Math.round(d.freeHeap / 1024)} KiB; fila ${d.queueDepth}; periódicas substituídas ${d.coalescedSamples}; motivo do boot ${d.resetReason}.`
+            : "Firmware sem diagnóstico. Atualize a placa para acompanhar conexão, memória e fila.",
+        ),
+      );
+      card.append(diagnostics);
       const limits = document.createElement("details");
       limits.append(element("summary", "Configurar limites ADC"));
       const form = document.createElement("form");
@@ -132,12 +289,14 @@ async function refresh() {
           const body = Object.fromEntries(
             [...new FormData(form)].map(([k, v]) => [k, Number(v)]),
           );
+          body.expectedVersion = row.desired_version;
           await api(
             `/devices/${row.device_id}/sensors/${row.channel}/config`,
             "PUT",
             body,
           );
           message("Configuração salva. Aguarde confirmação do dispositivo.");
+          limits.open = false;
           await refresh();
         });
       };
@@ -232,10 +391,35 @@ bind("telegram", async () => {
   await api("/me/telegram", "PUT", { chatId });
   message("Destino salvo. Confira a entrega em ensaio controlado.");
 });
-$("notifications").onclick = () =>
-  run(async () =>
-    detail("Entregas de notificações", await api("/notifications")),
+$("notifications").onclick = () => run(showNotifications);
+$("audit").onclick = () =>
+  run(async () => detail("Histórico de alterações", await api("/audit")));
+$("refresh").onclick = () => run(refresh);
+bind("evidence", async () => {
+  const values = formData("evidence"),
+    from = new Date(values.from),
+    to = new Date(values.to);
+  if (!Number.isFinite(+from) || !Number.isFinite(+to))
+    throw new Error("Informe início e fim do ensaio.");
+  const query = new URLSearchParams({
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  const bundle = await api(
+    `/devices/${encodeURIComponent(values.deviceId)}/evidence?${query}`,
   );
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mqfire-evidence-${values.deviceId}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  message(
+    `Pacote exportado: ${bundle.payload.rowCount} leituras. Confira o protocolo e pseudonimize o local antes de compartilhar.`,
+  );
+});
 $("hide-key").onclick = () => {
   $("api-key").textContent = "";
   $("credential").hidden = true;
@@ -252,10 +436,8 @@ run(async () => {
   }
 });
 setInterval(() => {
-  if (
-    signedIn &&
-    !document.hidden &&
-    !document.querySelector(".card details[open]")
-  )
-    run(refresh);
+  if (signedIn && !document.hidden) run(refresh);
 }, 10000);
+setInterval(() => {
+  if (signedIn) updateVisibleStates();
+}, 1000);

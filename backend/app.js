@@ -13,6 +13,8 @@ import {
   telemetry,
   dashboardStatus,
   requireObject,
+  integer,
+  evidenceWindow,
 } from "./domain.js";
 
 export function limiter(max, windowMs, key = (req) => req.ip) {
@@ -161,6 +163,10 @@ export function createApp({ repo, config }) {
     res.json(
       rows.map((r) => ({
         ...r,
+        diagnostics:
+          typeof r.diagnostics === "string"
+            ? JSON.parse(r.diagnostics)
+            : r.diagnostics,
         status: !r.enabled ? "DESATIVADO" : dashboardStatus(r),
       })),
     );
@@ -224,13 +230,14 @@ export function createApp({ repo, config }) {
     browserWrite,
     auth,
     async (req, res) => {
-      await repo.updateSensor(
+      const version = await repo.updateSensor(
         req.user.id,
         identifier(req.params.id),
         identifier(req.params.channel),
         sensorConfig(req.body),
+        integer(req.body.expectedVersion, 1, 2147483647, "Versão esperada"),
       );
-      res.json({ status: "pending_device_sync" });
+      res.json({ status: "pending_device_sync", version });
     },
   );
   app.get(
@@ -256,8 +263,59 @@ export function createApp({ repo, config }) {
   app.get("/api/v1/notifications", auth, async (req, res) =>
     res.json(await repo.notifications(req.user.id)),
   );
+  app.post(
+    "/api/v1/notifications/:id/retry",
+    browserWrite,
+    auth,
+    limiter(10, 60000, (req) => req.user.id),
+    async (req, res) => {
+      if (!config.telegramEnabled)
+        throw new HttpError(409, "Telegram desativado no servidor.");
+      await repo.retryNotification(
+        req.user.id,
+        integer(Number(req.params.id), 1, Number.MAX_SAFE_INTEGER, "Entrega"),
+      );
+      res.status(202).json({ status: "pending" });
+    },
+  );
+  app.get("/api/v1/audit", auth, async (req, res) =>
+    res.json(await repo.auditHistory(req.user.id)),
+  );
+  app.get("/api/v1/devices/:id/config/revisions", auth, async (req, res) =>
+    res.json(await repo.revisions(req.user.id, identifier(req.params.id))),
+  );
+  app.post(
+    "/api/v1/devices/:id/config/restore",
+    browserWrite,
+    auth,
+    async (req, res) => {
+      requireObject(req.body);
+      const version = await repo.restoreConfig(
+        req.user.id,
+        identifier(req.params.id),
+        integer(req.body.version, 1, 2147483647, "Revisão"),
+        integer(req.body.expectedVersion, 1, 2147483647, "Versão esperada"),
+      );
+      res.json({ status: "pending_device_sync", version });
+    },
+  );
+  app.get(
+    "/api/v1/devices/:id/evidence",
+    auth,
+    limiter(5, 60000, (req) => req.user.id),
+    async (req, res) => {
+      const id = identifier(req.params.id),
+        window = evidenceWindow(req.query);
+      const bundle = await repo.evidence(req.user.id, id, window);
+      res.set(
+        "Content-Disposition",
+        `attachment; filename="mqfire-evidence-${id}.json"`,
+      );
+      res.json(bundle);
+    },
+  );
   app.get("/api/v1/device/config", deviceAuth, async (req, res) =>
-    res.json(await repo.config(req.device.id)),
+    res.json(await repo.config(req.device.id, req.deviceHash)),
   );
   app.post(
     "/api/v1/telemetry",
@@ -293,18 +351,16 @@ export function createApp({ repo, config }) {
       console.error(
         JSON.stringify({ event: "request_failed", method: req.method, status }),
       );
-    res
-      .status(status)
-      .json({
-        error:
-          status >= 500
-            ? "Serviço indisponível. Tente novamente."
-            : error.code === "ER_DUP_ENTRY"
-              ? "Registro já existente."
-              : error.type === "entity.parse.failed"
-                ? "JSON inválido."
-                : error.message,
-      });
+    res.status(status).json({
+      error:
+        status >= 500
+          ? "Serviço indisponível. Tente novamente."
+          : error.code === "ER_DUP_ENTRY"
+            ? "Registro já existente."
+            : error.type === "entity.parse.failed"
+              ? "JSON inválido."
+              : error.message,
+    });
   });
   return app;
 }

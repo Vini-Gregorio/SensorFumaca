@@ -85,6 +85,26 @@ export function telemetry(body) {
     if (channels.has(r.channel)) throw new HttpError(400, "Canal repetido.");
     channels.add(r.channel);
   }
+  let diagnostics;
+  if (body.diagnostics !== undefined) {
+    const d = requireObject(body.diagnostics);
+    const firmware = text(d.firmware, "Firmware", 40);
+    if (!/^[a-zA-Z0-9._+-]+$/.test(firmware))
+      throw new HttpError(400, "Firmware inválido.");
+    diagnostics = {
+      firmware,
+      rssi: integer(d.rssi, -127, 0, "RSSI"),
+      freeHeap: integer(d.freeHeap, 0, 4294967295, "Memória livre"),
+      queueDepth: integer(d.queueDepth, 0, 65, "Fila"),
+      coalescedSamples: integer(
+        d.coalescedSamples,
+        0,
+        4294967295,
+        "Amostras substituídas",
+      ),
+      resetReason: integer(d.resetReason, 0, 255, "Motivo do boot"),
+    };
+  }
   // Canonicalização exclui campos extras e ageMs (a idade aumenta nas retransmissões).
   return {
     deviceId: body.deviceId,
@@ -94,6 +114,7 @@ export function telemetry(body) {
     configVersion: body.configVersion,
     droppedSamples: body.droppedSamples,
     manualAlarm: body.manualAlarm,
+    ...(diagnostics ? { diagnostics } : {}),
     readings: body.readings
       .map(({ channel, value, state }) => ({ channel, value, state }))
       .sort((a, b) => a.channel.localeCompare(b.channel)),
@@ -112,4 +133,30 @@ export function dashboardStatus(row, now = Date.now()) {
       FAULT: "FALHA",
     }[row.state] || "DESCONHECIDO"
   );
+}
+
+export function evidenceWindow(query) {
+  const parse = (value) => {
+    if (
+      typeof value !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)
+    )
+      throw new HttpError(400, "Informe from/to em UTC ISO 8601.");
+    const date = new Date(value);
+    if (
+      !Number.isFinite(date.getTime()) ||
+      date.toISOString() !==
+        (value.length === 20 ? `${value.slice(0, -1)}.000Z` : value)
+    )
+      throw new HttpError(400, "Data inválida.");
+    return date;
+  };
+  const from = parse(query.from),
+    to = parse(query.to);
+  if (to <= from || to - from > 86400000)
+    throw new HttpError(
+      400,
+      "Intervalo deve ser maior que zero e de até 24 h.",
+    );
+  return { from, to };
 }

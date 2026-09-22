@@ -106,7 +106,13 @@ test("sessão JSON funcional, cookie HttpOnly e logout invalida sessão", async 
 });
 test("protege recursos e remove debug/rotas legadas", async (t) => {
   const f = await fixture(t);
-  for (const path of ["/api/v1/devices", "/api/v1/notifications"])
+  for (const path of [
+    "/api/v1/devices",
+    "/api/v1/notifications",
+    "/api/v1/audit",
+    "/api/v1/devices/lab/config/revisions",
+    "/api/v1/devices/lab/evidence",
+  ])
     assert.equal((await f.request(path)).status, 401);
   for (const path of ["/debug", "/api/esp32", "/.env", "/backend/.env"])
     assert.equal((await f.request(path)).status, 404);
@@ -232,4 +238,89 @@ test("limite de tentativas de login", async (t) => {
     );
   assert.equal(r.status, 429);
   assert(r.headers.has("retry-after"));
+});
+test("edição de limite exige versão esperada; exportação valida intervalo e cabeçalho", async (t) => {
+  let calls = 0,
+    expected;
+  const f = await fixture(t, {
+    updateSensor: async (user, id, channel, config, version) => {
+      calls++;
+      expected = version;
+      return 2;
+    },
+    evidence: async () => ({ payload: { rowCount: 0 }, sha256: "fixture" }),
+  });
+  const Cookie = await f.login(),
+    headers = { Cookie, Origin: f.config.origin };
+  const body = { high: 900, low: 500, confirmMs: 1000 };
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/devices/lab/sensors/mq2/config",
+        "PUT",
+        body,
+        headers,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(calls, 0);
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/devices/lab/sensors/mq2/config",
+        "PUT",
+        { ...body, expectedVersion: 1 },
+        headers,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(expected, 1);
+  const r = await f.request(
+    "/api/v1/devices/lab/evidence?from=2026-09-22T00:00:00Z&to=2026-09-22T01:00:00Z",
+    "GET",
+    undefined,
+    { Cookie },
+  );
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("content-disposition"), /attachment/);
+  assert.equal(r.headers.get("cache-control"), "no-store");
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/devices/lab/evidence?from=invalid",
+        "GET",
+        undefined,
+        { Cookie },
+      )
+    ).status,
+    400,
+  );
+});
+test("reenvio manual exige origem e canal habilitado", async (t) => {
+  let called = false;
+  const f = await fixture(t, {
+      retryNotification: async () => {
+        called = true;
+      },
+    }),
+    Cookie = await f.login();
+  assert.equal(
+    (await f.request("/api/v1/notifications/1/retry", "POST", {}, { Cookie }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (
+      await f.request(
+        "/api/v1/notifications/1/retry",
+        "POST",
+        {},
+        { Cookie, Origin: f.config.origin },
+      )
+    ).status,
+    409,
+  );
+  assert.equal(called, false);
 });

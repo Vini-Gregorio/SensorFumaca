@@ -83,11 +83,17 @@ test(
         1,
         "Alarme contínuo não repete notificação",
       );
-      await repo.updateSensor(owner, id, "mq2", {
-        high: 900,
-        low: 600,
-        confirmMs: 1000,
-      });
+      await repo.updateSensor(
+        owner,
+        id,
+        "mq2",
+        {
+          high: 900,
+          low: 600,
+          confirmMs: 1000,
+        },
+        1,
+      );
       assert.equal((await repo.config(id)).version, 2);
       await repo.addSensor(owner, id, "mq2-extra", "Canal 2", {
         high: 900,
@@ -119,7 +125,9 @@ test(
       );
       const n = await repo.claimNotification();
       assert(n);
-      await repo.finishNotification(n.id, n.attempts, true);
+      await repo.finishNotification(n.id, n.attempts, true, false, {
+        leaseToken: n.leaseToken,
+      });
     } finally {
       await pool.end();
     }
